@@ -1,13 +1,15 @@
 <script setup>
-import {ref} from 'vue';
-import {RouterLink} from 'vue-router';
-import {useSidebarStore} from '@/stores/sidebar';
-import {useAuthStore} from '@/stores/auth';
-import {useUserCompute} from '@/composable/user';
+import { ref } from 'vue';
+import { RouterLink, useRouter } from 'vue-router';
+import { useSidebarStore } from '@/stores/sidebar';
+import { useAuthStore } from '@/stores/auth';
+import { useUserCompute } from '@/composable/user';
+import { logout as apiLogout } from '@/api/user';
 
 const authStore = useAuthStore();
 const sidebarStore = useSidebarStore();
-const {userRankInfo, userBanState} = useUserCompute();
+const router = useRouter();
+const { userRankInfo, userBanState } = useUserCompute();
 const menus = ref([
     {
         child: [
@@ -136,6 +138,28 @@ const menus = ref([
         ]
     }
 ]);
+
+// 移动端“退出登录”按钮会用到
+async function handleLogout() {
+  try {
+    await apiLogout();
+  } catch (e) {
+    console.error('logout error', e);
+  } finally {
+    if (authStore.clearAll) {
+      authStore.clearAll();
+    } else {
+      authStore.token = '';
+      authStore.refreshToken = '';
+      authStore.user = null;
+    }
+    router.push('/home');
+    if (sidebarStore && sidebarStore.hide) {
+      sidebarStore.hide();
+    }
+  }
+}
+
 </script>
 
 <template>
@@ -160,7 +184,7 @@ const menus = ref([
                     </a>
                 </router-link>
             </div>
-            <div class="user-info" id="user-info-mobile" style="display: block;">
+            <div class="user-info" id="user-info-mobile" style="display: block;" v-if="authStore.user">
                 <div class="user-basic">
                     <div class="user-avatar-wrapper-mobile">
                         <img id="user-avatar-mobile" class="user-avatar-mobile" alt="" :src="authStore.user.avatar">
@@ -189,10 +213,15 @@ const menus = ref([
                             <span data-i18n="user.settings">{{ $t('user.settings') }}</span>
                         </a>
                     </router-link>
-                    <a href="javascript:void(0);" id="logout-mobile" class="mobile-user-action-btn">
-                        <i class="fas fa-sign-out-alt me-2"></i>
-                        <span data-i18n="user.logout">{{ $t('user.logout') }}</span>
-                    </a>
+                  <a
+                      href="javascript:void(0);"
+                      id="logout-mobile"
+                      class="mobile-user-action-btn"
+                      @click.prevent="handleLogout"
+                  >
+                    <i class="fas fa-sign-out-alt me-2"></i>
+                    <span data-i18n="user.logout">{{ $t('user.logout') }}</span>
+                  </a>
                 </div>
             </div>
         </div>

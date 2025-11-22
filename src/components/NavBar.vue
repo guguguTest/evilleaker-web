@@ -1,23 +1,53 @@
 <script setup>
-import {ref} from 'vue';
-import {RouterLink} from 'vue-router';
-import {useI18nStore} from '@/stores/i18n';
-import {useAuthStore} from '@/stores/auth';
-import {useSidebarStore} from '@/stores/sidebar';
-import {useUserCompute} from '@/composable/user';
+import { ref } from 'vue';
+import { RouterLink, useRouter } from 'vue-router';
+import { useI18nStore } from '@/stores/i18n';
+import { useAuthStore } from '@/stores/auth';
+import { useSidebarStore } from '@/stores/sidebar';
+import { useUserCompute } from '@/composable/user';
+import { logout as apiLogout } from '@/api/user';
 
 const i18nStore = useI18nStore();
 const authStore = useAuthStore();
 const sidebarStore = useSidebarStore();
-const {userRankInfo, userSpecialRank, userBanState, userAuth} = useUserCompute();
+const { userRankInfo, userSpecialRank, userBanState, userAuth } = useUserCompute();
 const langPop = ref(false);
 const langPopMobile = ref(false);
 const userPop = ref(false);
+const router = useRouter();
 
 function switchLang(lang) {
-    i18nStore.setLocale(lang);
-    langPop.value = false;
-    langPopMobile.value = false;
+  i18nStore.setLocale(lang);
+  langPop.value = false;
+  langPopMobile.value = false;
+}
+
+// 电脑端用户菜单里的退出按钮会用到
+async function handleLogout() {
+  try {
+    // 调后端 /api/logout（从 Authorization 里拿 token）
+    await apiLogout();
+  } catch (e) {
+    console.error('logout error', e);
+  } finally {
+    // 统一清理前端登录状态
+    if (authStore.clearAll) {
+      authStore.clearAll();
+    } else {
+      // 兼容：万一 store 没实现 clearAll
+      authStore.token = '';
+      authStore.refreshToken = '';
+      authStore.user = null;
+    }
+
+    // 回首页
+    router.push('/home');
+
+    // 如果侧边栏是打开的，顺便收起来（可有可无）
+    if (sidebarStore && sidebarStore.hide) {
+      sidebarStore.hide();
+    }
+  }
 }
 </script>
 
@@ -152,7 +182,13 @@ function switchLang(lang) {
                                     <a :href="href" data-page="user-settings"
                                        @click="navigator">{{ $t('user.settings') }}</a>
                                 </router-link>
-                                <a href="javascript:void(0);" id="logout-pc">{{ $t('user.logout') }}</a>
+                              <a
+                                  href="javascript:void(0);"
+                                  id="logout-pc"
+                                  @click.prevent="handleLogout"
+                              >
+                                {{ $t('user.logout') }}
+                              </a>
                             </div>
                         </div>
                     </div>
