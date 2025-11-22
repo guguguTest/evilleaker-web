@@ -17,7 +17,7 @@ const languageOptions = [
 
 // 当前语言 & 记住语言
 const selectedLanguage = ref(i18nStore.lang || locale.value || 'zh');
-const rememberLanguage = ref(localStorage.getItem('rememberLanguage') !== 'false');
+// const rememberLanguage = ref(localStorage.getItem('rememberLanguage') !== 'false');
 
 // 鼠标样式
 const cursorStyles = [
@@ -68,15 +68,15 @@ function saveSettings() {
   // 切换语言
   i18nStore.setLocale(selectedLanguage.value);
 
-  // 记住语言偏好
-  if (rememberLanguage.value) {
-    localStorage.setItem('rememberLanguage', 'true');
-    // locale 已经在 store 里写入 localStorage('locale')
-  } else {
-    localStorage.setItem('rememberLanguage', 'false');
-    // 不希望下次自动记住，就把当前的 locale 存储清掉
-    localStorage.removeItem('locale');
-  }
+  // // 记住语言偏好
+  // if (rememberLanguage.value) {
+  //   localStorage.setItem('rememberLanguage', 'true');
+  //   // locale 已经在 store 里写入 localStorage('locale')
+  // } else {
+  //   localStorage.setItem('rememberLanguage', 'false');
+  //   // 不希望下次自动记住，就把当前的 locale 存储清掉
+  //   localStorage.removeItem('locale');
+  // }
 
   if (typeof window !== 'undefined' && window.showSuccessMessage) {
     window.showSuccessMessage(t('common.success'));
@@ -150,27 +150,26 @@ onMounted(() => {
             </option>
           </select>
         </div>
-
-        <div class="setting-item">
-          <div>
-            <span data-i18n="settings.rememberLanguage">
-              {{ t('settings.rememberLanguage') || '记住语言偏好' }}
-            </span>
-            <div
-                class="setting-description"
-                data-i18n="settings.rememberLanguageDesc"
-            >
-              {{
-                t('settings.rememberLanguageDesc')
-                || '下次访问时自动使用您选择的语言'
-              }}
-            </div>
-          </div>
-          <label class="switch">
-            <input type="checkbox" v-model="rememberLanguage" />
-            <span class="slider"></span>
-          </label>
-        </div>
+<!--        <div class="setting-item">-->
+<!--          <div>-->
+<!--            <span data-i18n="settings.rememberLanguage">-->
+<!--              {{ t('settings.rememberLanguage') || '记住语言偏好' }}-->
+<!--            </span>-->
+<!--            <div-->
+<!--                class="setting-description"-->
+<!--                data-i18n="settings.rememberLanguageDesc"-->
+<!--            >-->
+<!--              {{-->
+<!--                t('settings.rememberLanguageDesc')-->
+<!--                || '下次访问时自动使用您选择的语言'-->
+<!--              }}-->
+<!--            </div>-->
+<!--          </div>-->
+<!--          <label class="switch">-->
+<!--            <input type="checkbox" v-model="rememberLanguage" />-->
+<!--            <span class="slider"></span>-->
+<!--          </label>-->
+<!--        </div>-->
       </div>
     </div>
 
