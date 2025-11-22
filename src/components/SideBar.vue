@@ -3,6 +3,7 @@ import {RouterLink, useRoute, useRouter} from 'vue-router';
 import {useSidebarStore} from '@/stores/sidebar';
 import {useAuthStore} from '@/stores/auth';
 import {useUserCompute} from '@/composable/user';
+import {onMounted, ref, watch} from "vue";
 
 const authStore = useAuthStore();
 const sidebarStore = useSidebarStore();
@@ -11,6 +12,7 @@ const {userRankInfo, userBanState} = useUserCompute();
 
 const routes = router.options.routes;
 const route = useRoute();
+const menu = ref([]);
 
 // 移动端“退出登录”按钮会用到
 async function handleLogout() {
@@ -23,11 +25,13 @@ async function handleLogout() {
   }
 }
 
+// 跳转
 function goTo(to) {
   router.push(to);
   sidebarStore.hide();
 }
 
+// 菜单高亮
 function isActive(path) {
   // 去掉末尾斜杠
   const normalize = p => p.replace(/\/$/, '');
@@ -38,6 +42,70 @@ function isActive(path) {
   // 当前页面是菜单 path 的子路径
   return currentPath.startsWith(menuPath + '/')
 }
+
+// 检查菜单权限
+// 菜单要显示，需要满足几个条件
+// rank needLogin permission.visible
+function checkMenuPermission(menu) {
+  const user = authStore.user;
+  const rank = user ? user.user_rank : 0;
+  const permission = authStore.hasPermission(menu.meta?.rule);
+  const ban = user ? user.banState : false;
+
+  console.log('菜单条件', '等级: ', rank, '登录: ', !!user, '权限: ', permission, '封禁: ', ban);
+
+  if (menu.meta.ban !== undefined && !menu.meta.ban.includes(ban))
+    return false;
+  if (menu.meta.rank !== undefined && !menu.meta.rank.includes(rank))
+    return false;
+  if (menu.meta.needLogin !== undefined && menu.meta.needLogin && !user)
+    return false;
+  if (menu.meta.rule !== undefined && !permission.visible)
+    return false;
+  return true;
+}
+
+// 构造菜单树
+function buildMenu() {
+  menu.value = [];
+  routes.forEach((route) => {
+    if (route.meta?.hidden === true)
+      return;
+    const c = [];
+    if (route.children) {
+      route.children.forEach(child => {
+        if (child.meta?.hidden === true)
+          return;
+        if (!checkMenuPermission(child))
+          return;
+        c.push({
+          path: child.path,
+          title: child.meta?.title,
+          icon: child.meta?.icon
+        });
+      });
+    }
+    if (c.length > 0) {
+      menu.value.push({
+        path: route.path,
+        title: route.meta?.title,
+        icon: route.meta?.icon,
+        child: c
+      });
+    }
+  });
+}
+
+onMounted(() => {
+  // 构造菜单
+  buildMenu();
+});
+
+// 监听登录状态，刷新菜单
+watch(() => authStore.permissions, () => {
+  console.log('用户权限更新，刷新菜单栏');
+  buildMenu();
+});
 </script>
 
 <template>
@@ -103,27 +171,25 @@ function isActive(path) {
         </div>
       </div>
     </div>
-    <template v-for="item in routes">
+    <template v-for="(item, i) in menu">
       <!-- 菜单分组标题 -->
-      <template v-if="item.meta && !item.meta.hidden && item.meta.title">
+      <template v-if="item.title">
         <div class="sidebar-section-title" id="admin-section-title">
-          <i :class="item.meta.icon"></i>
-          <span>{{ $t(item.meta.title) }}</span>
+          <i :class="item.icon"></i>
+          <span>{{ $t(item.title) }}</span>
         </div>
       </template>
-      <template v-if="item.children">
-        <ul class="sidebar-nav" v-if="item.children">
-          <template v-for="child in item.children">
-            <li v-if="child.meta && !child.meta.hidden">
-              <a :class="{'active' : isActive(child.path)}" href="javascript:void(0);" @click="goTo(child.path)">
-                <i :class="child.meta.icon"></i>
-                <span>{{ $t(child.meta.title) }}</span>
-              </a>
-            </li>
-          </template>
-        </ul>
-        <div class="sidebar-divider"></div>
-      </template>
+      <!-- 菜单项 -->
+      <ul class="sidebar-nav">
+        <li v-for="child in item.child">
+          <a :class="{'active' : isActive(child.path)}" href="javascript:void(0);" @click="goTo(child.path)">
+            <i :class="child.icon"></i>
+            <span>{{ $t(child.title) }}</span>
+          </a>
+        </li>
+      </ul>
+      <!-- 分割线 -->
+      <div class="sidebar-divider" v-if="i < menu.length - 1"></div>
     </template>
   </div>
 </template>
