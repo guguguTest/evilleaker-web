@@ -50,8 +50,14 @@ const routes = [
             {
                 name: 'Download',
                 path: '/download',
-                component: () => import('@/views/404.vue'),
+                component: () => import('../views/Download.vue'),
                 meta: {title: 'sidebar.download', icon: 'fas fa-download me-2', role: 'download'}
+            },
+            {
+                name: 'DownloadDetail',
+                path: '/download-detail/:id',
+                component: () => import('../views/DownloadDetail.vue'),
+                props: true,
             },
             // 实用工具
             {
