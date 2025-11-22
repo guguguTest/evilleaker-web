@@ -39,7 +39,17 @@ const routes = [
         name: 'UserSettings',
         component: () => import('../views/user/UserSettings.vue'),
     },
-
+    {
+        path: '/download',
+        name: 'Download',
+        component: () => import('../views/Download.vue'),
+    },
+    {
+        path: '/download-detail/:id',
+        name: 'DownloadDetail',
+        component: () => import('../views/DownloadDetail.vue'),
+        props: true,
+    },
     // 网页设置（侧边栏的 settings）
     {
         path: '/settings',
