@@ -1,16 +1,30 @@
-import './assets/main.css'
+// src/main.js
+import './assets/main.css';
 
-import { createApp } from 'vue'
-import { createPinia } from 'pinia'
+import {createApp} from 'vue';
+import {createPinia} from 'pinia';
 
-import App from './App.vue'
-import router from './router'
-import i18n from './locales'
+import App from './App.vue';
+import router from './router';
+import i18n from './locales';
 
-const app = createApp(App)
+// 关键：引入消息工具，并挂到 window，兼容老代码
+import {
+    showSuccessMessage,
+    showErrorMessage,
+    showInfoMessage,
+} from '@/utils/message';
 
-app.use(createPinia())
-app.use(router)
-app.use(i18n)
+if (typeof window !== 'undefined') {
+    window.showSuccessMessage = showSuccessMessage;
+    window.showErrorMessage = showErrorMessage;
+    window.showInfoMessage = showInfoMessage;
+}
 
-app.mount('#app')
+const app = createApp(App);
+
+app.use(createPinia());
+app.use(router);
+app.use(i18n);
+
+app.mount('#app');
