@@ -10,7 +10,7 @@ export default [
             {
                 name: 'UserAdmin',
                 path: '/admin/user-manager',
-                component: () => import('@/views/404.vue'),
+                component: () => import('@/views/admin/UserManager.vue'),
                 meta: {
                     ...PRESET_ADMIN,
                     title: 'sidebar.userManager',

@@ -3,22 +3,25 @@ import {RouterView} from 'vue-router'
 import SideBar from '@/components/SideBar.vue';
 import NavBar from '@/components/NavBar.vue';
 import {useSidebarStore} from '@/stores/sidebar';
+import zhCn from 'element-plus/es/locale/lang/zh-cn'
 
 const sidebar = useSidebarStore()
 </script>
 
 <template>
-  <nav-bar/>
-  <side-bar/>
-  <div class="main-content" id="content-container">
-    <RouterView/>
-  </div>
-  <div class="spa-loader">
-    <div class="spinner-border text-primary" role="status">
-      <span class="visually-hidden">Loading...</span>
+  <el-config-provider :locale="zhCn">
+    <nav-bar/>
+    <side-bar/>
+    <div class="main-content" id="content-container">
+      <RouterView/>
     </div>
-  </div>
-  <div id="sidebar-overlay" class="sidebar-overlay" :class="{show: sidebar.state}" @click="sidebar.hide()"></div>
+    <div class="spa-loader">
+      <div class="spinner-border text-primary" role="status">
+        <span class="visually-hidden">Loading...</span>
+      </div>
+    </div>
+    <div id="sidebar-overlay" class="sidebar-overlay" :class="{show: sidebar.state}" @click="sidebar.hide()"></div>
+  </el-config-provider>
 </template>
 
 <style scoped>
