@@ -3,7 +3,7 @@
 import { ref, onBeforeUnmount } from 'vue'
 import { useRouter } from 'vue-router'
 import { sendVerificationCode, verifyCode } from '@/api/user'
-import { showSuccessMessage } from '@/utils/message'   // ✅ 只保留成功弹窗
+import { showSuccessMessage } from '@/utils/messageBox'   // ✅ 只保留成功弹窗
 
 const router = useRouter()
 

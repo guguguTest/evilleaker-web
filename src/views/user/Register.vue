@@ -4,7 +4,7 @@ import { ref, onBeforeUnmount } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { register as apiRegister, sendVerificationCode } from '@/api/user'
-import { showSuccessMessage } from '@/utils/message'   // ✅ 只保留成功弹窗
+import { showSuccessMessage } from '@/utils/message.js'   // ✅ 只保留成功弹窗
 
 const router = useRouter()
 const authStore = useAuthStore()

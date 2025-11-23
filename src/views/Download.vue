@@ -285,9 +285,9 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue';
-import { useRouter } from 'vue-router';
-import { useAuthStore } from '@/stores/auth';
+import {ref, computed, onMounted} from 'vue';
+import {useRouter} from 'vue-router';
+import {useAuthStore} from '@/stores/auth';
 import {
   checkDownloadPermission,
   fetchDownloads,
@@ -297,7 +297,7 @@ import {
   showErrorMessage,
   showInfoMessage,
   showSuccessMessage,
-} from '@/utils/message';
+} from '@/utils/messageBox.js';
 
 const router = useRouter();
 const authStore = useAuthStore();
@@ -442,7 +442,7 @@ async function handleRowClick(download) {
       if (result && result.success) {
         showSuccessMessage(`已扣除 ${download.required_points} 积分`);
         setTimeout(() => {
-          router.push({ name: 'DownloadDetail', params: { id } });
+          router.push({name: 'DownloadDetail', params: {id}});
         }, 800);
       } else {
         showErrorMessage(result?.error || '访问资源失败');
@@ -456,7 +456,7 @@ async function handleRowClick(download) {
   }
 
   // 不需要积分，直接跳转详情页
-  router.push({ name: 'DownloadDetail', params: { id } });
+  router.push({name: 'DownloadDetail', params: {id}});
 }
 
 // 返回首页按钮
@@ -519,9 +519,8 @@ onMounted(() => {
   content: '';
   position: absolute;
   inset: 0;
-  background:
-      radial-gradient(circle at top left, rgba(86, 197, 255, 0.12), transparent 55%),
-      radial-gradient(circle at bottom right, rgba(111, 66, 193, 0.07), transparent 60%);
+  background: radial-gradient(circle at top left, rgba(86, 197, 255, 0.12), transparent 55%),
+  radial-gradient(circle at bottom right, rgba(111, 66, 193, 0.07), transparent 60%);
   opacity: 0.6;
   pointer-events: none;
 }
@@ -695,10 +694,9 @@ onMounted(() => {
 /* 行 hover 效果 */
 .download-row {
   cursor: pointer;
-  transition:
-      background-color 0.15s ease,
-      transform 0.1s ease,
-      box-shadow 0.15s ease;
+  transition: background-color 0.15s ease,
+  transform 0.1s ease,
+  box-shadow 0.15s ease;
 }
 
 .download-row:hover {

@@ -1,10 +1,9 @@
 import axios from 'axios';
 import {useAuthStore} from '@/stores/auth';
-
-const baseURL = import.meta.env.VITE_API_BASE_URL || '/api'
+import {baseUrl} from '@/api/base';
 
 const request = axios.create({
-    baseURL,
+    baseURL: baseUrl,
     timeout: 5000,
     withCredentials: true,
     headers: {

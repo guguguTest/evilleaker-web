@@ -132,11 +132,11 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref, watch } from 'vue';
-import { useRoute, useRouter } from 'vue-router';
-import { fetchDownloadDetail, createDownloadFileToken } from '@/api/download';
-import { showErrorMessage } from '@/utils/message';
-import { useAuthStore } from '@/stores/auth';
+import {computed, onMounted, ref, watch} from 'vue';
+import {useRoute, useRouter} from 'vue-router';
+import {fetchDownloadDetail, createDownloadFileToken} from '@/api/download';
+import {showErrorMessage} from '@/utils/messageBox';
+import {useAuthStore} from '@/stores/auth';
 
 const route = useRoute();
 const router = useRouter();
@@ -210,7 +210,7 @@ function reload() {
 }
 
 function goBack() {
-  router.push({ name: 'Download' });
+  router.push({name: 'Download'});
 }
 
 // 直链下载（参考原版：Token 清理 + Blob 下载）
@@ -397,9 +397,8 @@ watch(
   padding: 0.25rem 0.75rem;
   border-radius: 999px;
   background-color: #f1f3f5;
-  transition:
-      background-color 0.15s ease,
-      transform 0.1s ease;
+  transition: background-color 0.15s ease,
+  transform 0.1s ease;
   cursor: pointer;
 }
 
@@ -564,10 +563,9 @@ watch(
   border-radius: 999px;
   font-size: 0.9rem;
   box-shadow: 0 2px 8px rgba(76, 111, 255, 0.35);
-  transition:
-      box-shadow 0.15s ease,
-      transform 0.1s ease,
-      opacity 0.15s ease;
+  transition: box-shadow 0.15s ease,
+  transform 0.1s ease,
+  opacity 0.15s ease;
 }
 
 .direct-download-link:hover {
