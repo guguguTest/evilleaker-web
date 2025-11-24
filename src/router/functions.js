@@ -11,6 +11,7 @@ export default [
                 name: 'Fortune',
                 path: '/fortune',
                 component: () => import('@/views/404.vue'),
+                component: () => import('@/views/Fortune.vue'),
                 meta: {
                     ...PRESET_LOGIN_BS0,
                     title: 'sidebar.fortune',
