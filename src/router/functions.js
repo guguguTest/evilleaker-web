@@ -21,7 +21,7 @@ export default [
             {
                 name: 'Ccb',
                 path: '/ccb',
-                component: () => import('@/views/404.vue'),
+                component: () => import('@/views/Ccb.vue'),
                 meta: {
                     ...PRESET_LOGIN_BS0,
                     title: 'sidebar.ccb',
