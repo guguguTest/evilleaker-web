@@ -1,89 +1,123 @@
 // src/api/ccb.js
-// 说明：统一经由这里访问后端；需要项目里已配置 base（如 axios 实例）。
-// 如你们项目有 axios 封装，请把 fetch 换成 request 实例，并移除 authHeaders。
+// 统一使用项目 axios 实例（已含 baseURL/withCredentials/拦截器）
+import request from '@/api/index';
+import { useAuthStore } from '@/stores/auth';
 
-const BASE = '/api';
-
-function authHeaders(includeJson = false) {
-    const token = localStorage.getItem('token') || '';
-    return {
-        Authorization: `Bearer ${token}`,
-        ...(includeJson ? { 'Content-Type': 'application/json' } : {}),
-    };
+function authHeader() {
+    const auth = useAuthStore();
+    return auth?.token ? { Authorization: `Bearer ${auth.token}` } : {};
 }
 
-// 用户信息（用于积分/绑定读入）
-export async function apiGetUser() {
-    const res = await fetch(`${BASE}/user`, { headers: authHeaders() });
-    if (!res.ok) throw new Error('获取用户信息失败');
-    return res.json();
+// 说明：你们响应拦截器已 `return res.data`，所以这里**不要**再解构 { data }。
+// 直接返回 request 调用结果（即响应体）。
+
+// 用户信息（积分/绑定读入）
+export function apiGetUser() {
+    return request.get('/api/user', { headers: { ...authHeader() } });
 }
 
-// 服务器/游戏列表
-export async function apiListServers() {
-    const res = await fetch(`${BASE}/ccb/servers`);
-    if (!res.ok) throw new Error('加载服务器列表失败');
-    return res.json();
+// 服务器/游戏列表（给到 15s 超时）
+export function apiListServers() {
+    return request.get('/api/ccb/servers', { timeout: 15000 });
 }
-export async function apiListGames() {
-    const res = await fetch(`${BASE}/ccb/games`);
-    if (!res.ok) throw new Error('加载游戏列表失败');
-    return res.json();
+export function apiListGames() {
+    return request.get('/api/ccb/games', { timeout: 15000 });
 }
 
-// 绑定/解绑/切换
+// 绑定/解绑/切换 —— 统一在 4xx 时把后端的错误文案透传出来
+function extractServerError(e, fallback) {
+    const res = e?.response;
+    const d = res?.data;
+    if (typeof d === 'string' && d.trim()) return d;
+    if (d && typeof d === 'object') {
+        return (
+            d.error ||
+            d.message ||
+            d.detail ||
+            (Array.isArray(d.errors) && d.errors[0]) ||
+            fallback
+        );
+    }
+    return fallback;
+}
+
 export async function apiBindCard({ slot, game_server, keychip, guid }) {
-    const res = await fetch(`${BASE}/ccb/bind`, {
-        method: 'POST',
-        headers: authHeaders(true),
-        body: JSON.stringify({ slot, game_server, keychip, guid }),
-    });
-    const data = await res.json();
-    if (!res.ok || !data.success) throw new Error(data.error || '绑定失败');
-    return data;
+    try {
+        const res = await request.post(
+            '/api/ccb/bind',
+            { slot, game_server, keychip, guid },
+            {
+                headers: { ...authHeader(), 'Content-Type': 'application/json' },
+                timeout: 20000,
+            }
+        );
+        if (!res?.success) throw new Error(res?.error || '绑定失败');
+        return res;
+    } catch (e) {
+        const msg = extractServerError(e, '绑定失败');
+        throw new Error(msg);
+    }
 }
 
 export async function apiUnbindCard(slot) {
-    const res = await fetch(`${BASE}/ccb/unbind`, {
-        method: 'POST',
-        headers: authHeaders(true),
-        body: JSON.stringify({ slot }),
-    });
-    const data = await res.json();
-    if (!res.ok || !data.success) throw new Error(data.error || '解绑失败');
-    return data;
+    try {
+        const res = await request.post(
+            '/api/ccb/unbind',
+            { slot },
+            { headers: { ...authHeader() }, timeout: 15000 }
+        );
+        if (!res?.success) throw new Error(res?.error || '解绑失败');
+        return res;
+    } catch (e) {
+        const msg = extractServerError(e, '解绑失败');
+        throw new Error(msg);
+    }
 }
 
 export async function apiUnbindAll() {
-    const res = await fetch(`${BASE}/ccb/unbind-all`, {
-        method: 'POST',
-        headers: authHeaders(true),
-        body: JSON.stringify({}),
-    });
-    const data = await res.json();
-    if (!res.ok || !data.success) throw new Error(data.error || '解绑失败');
-    return data;
+    try {
+        const res = await request.post(
+            '/api/ccb/unbind-all',
+            {},
+            { headers: { ...authHeader() }, timeout: 20000 }
+        );
+        if (!res?.success) throw new Error(res?.error || '解绑失败');
+        return res;
+    } catch (e) {
+        const msg = extractServerError(e, '解绑失败');
+        throw new Error(msg);
+    }
 }
 
 export async function apiSwitchActive(slot) {
-    const res = await fetch(`${BASE}/ccb/switch`, {
-        method: 'POST',
-        headers: authHeaders(true),
-        body: JSON.stringify({ slot }),
-    });
-    const data = await res.json();
-    if (!res.ok || !data.success) throw new Error(data.error || '切换失败');
-    return data;
+    try {
+        const res = await request.post(
+            '/api/ccb/switch',
+            { slot },
+            { headers: { ...authHeader() }, timeout: 15000 }
+        );
+        if (!res?.success) throw new Error(res?.error || '切换失败');
+        return res;
+    } catch (e) {
+        const msg = extractServerError(e, '切换失败');
+        throw new Error(msg);
+    }
 }
 
-// 查分
-export async function apiQueryScore({ game, slot }) {
-    const res = await fetch(`${BASE}/ccb/query`, {
-        method: 'POST',
-        headers: authHeaders(true),
-        body: JSON.stringify({ game, slot }),
-    });
-    const data = await res.json();
-    if (!res.ok || !data.success) throw new Error(data.error || '查询失败');
-    return data; // { success: true, status: 'ok', image_base64: '...' }
+// 查分（最慢，给 60s；支持 abort signal 取消）
+export async function apiQueryScore({ game, slot, signal }) {
+    try {
+        const res = await request.post(
+            '/api/ccb/query',
+            { game, slot },
+            { headers: { ...authHeader() }, timeout: 60000, signal }
+        );
+        if (!res?.success) throw new Error(res?.error || '查询失败');
+        return res; // { success:true, status:'ok', image_base64:'...' }
+    } catch (e) {
+        const msg = extractServerError(e, '查询失败');
+        // Axios 在 signal abort 时也会抛错，这里直接原样抛
+        if (e?.code === 'ERR_CANCELED') throw e;
+        throw new Error(msg);
+    }
 }
