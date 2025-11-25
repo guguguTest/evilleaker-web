@@ -54,14 +54,18 @@ export default {
         'ccb.setPrimary': '设为主查分卡片',
         'ccb.unbindAll': '全部解绑',
         'ccb.unbindCurrent': '解绑当前卡片',
-
+        'ccb.chooseGamePlaceholder': '请选择游戏',
+        'ccb.cardSlotTitle': '卡片{slot}',
+        'ccb.cardSlotTitle1': '卡片1',
+        'ccb.cardSlotTitle2': '卡片2',
+        'ccb.cardSlotTitle3': '卡片3',
         'ccb.bind.title': '绑定卡片{slot}',
         'ccb.server': '服务器',
         'ccb.server.select': '请选择服务器',
         'ccb.guid.label': '游戏卡号 (20位纯数字)',
         'ccb.scan': '扫码输入',
         'ccb.keychip.label': 'KeyChip（以 A 开头的 11 位英数字）',
-        'ccb.keychip.default': '使用默认 KeyChip（A63E01A8888）',
+        'ccb.keychip.default': '使用默认 KeyChip',
 
         'ccb.drop.title': '拖入或点击选择文件读取卡号',
         'ccb.drop.desc': '仅支持 aime.txt 或 felica.txt',
@@ -101,7 +105,7 @@ export default {
         'ccb.err.serverInvalid': '所选服务器无效，请重新选择',
 
         'ccb.hint.guid': '仅限输入20位纯数字，或点击扫码按钮识别卡片',
-        'ccb.hint.keychip': '支持粘贴 15 位格式（如 A39E-01L99390821），会自动去符号并截为前 11 位；必须以 A 开头',
+        'ccb.hint.keychip': '支持粘贴 15 位格式，会自动转换为有效格式',
 
         'ccb.confirm.switch': '确定将卡片{slot}设为主查分卡片吗？',
         'ccb.confirm.unbindAll': '确定要解绑全部卡片吗？此操作不可撤销。',
@@ -443,14 +447,18 @@ export default {
         'ccb.setPrimary': 'Set as Primary',
         'ccb.unbindAll': 'Unbind All',
         'ccb.unbindCurrent': 'Unbind Current Card',
-
+        'ccb.chooseGamePlaceholder': 'Please choose a game',
+        'ccb.cardSlotTitle': 'Card {slot}',
+        'ccb.cardSlotTitle1': 'Card 1',
+        'ccb.cardSlotTitle2': 'Card 2',
+        'ccb.cardSlotTitle3': 'Card 3',
         'ccb.bind.title': 'Bind Card {slot}',
         'ccb.server': 'Server',
         'ccb.server.select': 'Please select server',
         'ccb.guid.label': 'Card Number (20 digits)',
         'ccb.scan': 'Scan',
         'ccb.keychip.label': 'KeyChip (11 uppercase alphanumerics starting with A)',
-        'ccb.keychip.default': 'Use default KeyChip (A63E01A8888)',
+        'ccb.keychip.default': 'Use default KeyChip',
 
         'ccb.drop.title': 'Drop or click to choose a file to fill card number',
         'ccb.drop.desc': 'Only aime.txt or felica.txt are supported',
@@ -490,7 +498,7 @@ export default {
         'ccb.err.serverInvalid': 'Selected server is invalid. Please choose again.',
 
         'ccb.hint.guid': 'Enter exactly 20 digits, or use the scan button',
-        'ccb.hint.keychip': 'Pasting 15-char format (e.g. A39E-01L99390821) is supported; symbols will be removed and trimmed to the first 11; must start with A.',
+        'ccb.hint.keychip': 'Pasting 15-char format (e.g. AXXX-XXXXXXXXXXX) is supported; symbols will be removed and trimmed to the first 11; must start with A.',
 
         'ccb.confirm.switch': 'Set Card {slot} as Primary?',
         'ccb.confirm.unbindAll': 'Unbind all cards? This cannot be undone.',
@@ -831,14 +839,18 @@ export default {
         'ccb.setPrimary': '主カードに設定',
         'ccb.unbindAll': 'すべて解除',
         'ccb.unbindCurrent': '現在のカードを解除',
-
+        'ccb.chooseGamePlaceholder': 'ゲームを選択してください',
+        'ccb.cardSlotTitle': 'カード{slot}',
+        'ccb.cardSlotTitle1': 'カード1',
+        'ccb.cardSlotTitle2': 'カード2',
+        'ccb.cardSlotTitle3': 'カード3',
         'ccb.bind.title': 'カード{slot}をバインド',
         'ccb.server': 'サーバー',
         'ccb.server.select': 'サーバーを選択してください',
         'ccb.guid.label': 'ゲームカード番号（20桁の数字）',
         'ccb.scan': 'スキャン入力',
         'ccb.keychip.label': 'KeyChip（Aで始まる大文字英数字11桁）',
-        'ccb.keychip.default': 'デフォルト KeyChip（A63E01A8888）を使用',
+        'ccb.keychip.default': 'デフォルト KeyChip を使用',
 
         'ccb.drop.title': 'ファイルをドラッグ＆ドロップ、またはクリックして選択',
         'ccb.drop.desc': 'aime.txt または felica.txt のみ対応',
@@ -878,7 +890,7 @@ export default {
         'ccb.err.serverInvalid': '選択したサーバーが無効です。もう一度選択してください。',
 
         'ccb.hint.guid': '20桁の数字のみ入力、またはスキャンボタンで読み取り',
-        'ccb.hint.keychip': '15桁形式（例：A39E-01L99390821）の貼り付けに対応。記号を除去して先頭11桁に整形します。Aで始まる必要があります。',
+        'ccb.hint.keychip': '15桁形式（例：AXXX-XXXXXXXXXXX）の貼り付けに対応。記号を除去して先頭11桁に整形します。Aで始まる必要があります。',
 
         'ccb.confirm.switch': 'カード{slot}を主カードに設定しますか？',
         'ccb.confirm.unbindAll': 'すべてのカードを解除しますか？この操作は取り消せません。',

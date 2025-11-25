@@ -21,7 +21,7 @@
             </div>
 
             <!-- 居中显示标题与状态 -->
-            <div class="slot-title">{{ $t('ccb.cardSlotTitle', { slot }) }}</div>
+            <div class="slot-title">{{ i18nCardTitle(slot) }}</div>
             <div
                 class="slot-status"
                 :class="store.isSlotBound(slot) ? 'ok' : 'warn'"
@@ -194,7 +194,7 @@
 
     <div v-else class="loading">{{ loadingText }}</div>
 
-    <!-- 扫码弹窗（该块文案如需 i18n，可按同样模式补 key；目前保留原样） -->
+    <!-- 扫码弹窗（如需 i18n，可同样替换为 $t） -->
     <div v-if="scanOpen" class="scan-modal">
       <div class="scan-modal-content">
         <div class="scan-modal-header">
@@ -234,6 +234,21 @@ const store = useCcbStore();
 
 const form = reactive({ server:'', guid:'', keychip:'' });
 const useDefaultKeychip = ref(false);
+
+/** 统一获取卡片标题（支持 1/2/3 独立键名 & 通用键名 & 兜底） */
+function i18nCardTitle(slot) {
+  const specificKey = `ccb.cardSlotTitle${slot}`;
+  const sp = t(specificKey);
+  if (sp !== specificKey) return sp;
+
+  const genericKey = 'ccb.cardSlotTitle';
+  const gen = t(genericKey, { slot });
+  if (gen !== genericKey) return gen;
+
+  // fallback: common.card + 序号
+  const common = t('common.card');
+  return (common === 'common.card' ? '卡片' : common) + String(slot);
+}
 
 /* ===================== 主卡片：刷新后依旧显示 ===================== */
 const localPrimarySlot = ref(null);
@@ -497,7 +512,7 @@ async function processFile(file) {
       return;
     }
     form.guid = store.normalizeGuid(digits.slice(0, 20));
-    ElMessage.success('OK');
+    ElMessage.success('OK'); // 可选：加入成功提示键
   } else {
     const hex = text.replace(/[^0-9A-Fa-f]/g, '').slice(0, 16);
     if (hex.length !== 16) {
@@ -508,13 +523,12 @@ async function processFile(file) {
       const dec = BigInt('0x' + hex).toString(10);
       const padded = dec.padStart(20, '0').slice(0, 20);
       form.guid = store.normalizeGuid(padded);
-      ElMessage.success('OK');
+      ElMessage.success('OK'); // 可选：加入成功提示键
     } catch {
       ElMessage.error(t('ccb.err.felicaConv'));
     }
   }
 }
-
 
 /** —— 扫码 —— */
 const scanOpen = ref(false);
