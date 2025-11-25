@@ -44,6 +44,74 @@ export default {
         'home.selectFunction': '请从左侧菜单选择功能',
         'home.announcementsLoading': '公告加载中...',
 
+        // ==== CCB（查分 & 绑定）====
+        'ccb.pageTitle': '游戏查分',
+        'ccb.cardManageTitle': '卡片管理',
+        'ccb.card': '卡片',
+        'ccb.status.bound': '已绑定',
+        'ccb.status.unbound': '未绑定',
+        'ccb.primaryBadge': '主卡片',
+        'ccb.setPrimary': '设为主查分卡片',
+        'ccb.unbindAll': '全部解绑',
+        'ccb.unbindCurrent': '解绑当前卡片',
+
+        'ccb.bind.title': '绑定卡片{slot}',
+        'ccb.server': '服务器',
+        'ccb.server.select': '请选择服务器',
+        'ccb.guid.label': '游戏卡号 (20位纯数字)',
+        'ccb.scan': '扫码输入',
+        'ccb.keychip.label': 'KeyChip（以 A 开头的 11 位英数字）',
+        'ccb.keychip.default': '使用默认 KeyChip（A63E01A8888）',
+
+        'ccb.drop.title': '拖入或点击选择文件读取卡号',
+        'ccb.drop.desc': '仅支持 aime.txt 或 felica.txt',
+        'ccb.bind.submit': '绑定卡片{slot}',
+
+        'ccb.query.title': '查询分数',
+        'ccb.chooseGame': '选择游戏',
+        'ccb.notice.title': '提示',
+        'ccb.notice.html': '每次查分将消耗<b>1点普通积分</b>，查询结果以图片形式展示。<br>每次查分后需要等待10秒后才能再次查询。<br><br>保存图片按钮在移动端某些浏览器可能无效。如无效请长按图片保存到相册。',
+        'ccb.query': '查分',
+        'ccb.cancelQuery': '取消查询',
+
+        'ccb.points.panelLabel': '当前积分：',
+        'ccb.refresh': '刷新',
+        'ccb.refreshed': '已刷新',
+        'ccb.cooldown': '{sec} 秒后可再次查分',
+
+        'ccb.result.title': '查询结果',
+        'ccb.result.empty': '暂无结果，请先执行查分',
+        'ccb.saveImage': '保存图片',
+
+        // 消息 & 错误 & 确认
+        'ccb.msg.bindSuccess': '绑定成功',
+        'ccb.msg.bindFailed': '绑定失败',
+        'ccb.msg.unbindAllSuccess': '已解绑全部卡片',
+        'ccb.msg.unbindSuccess': '已解绑当前卡片',
+        'ccb.msg.switchSuccess': '设置成功',
+        'ccb.msg.switchFailed': '设置失败',
+
+        'ccb.err.fileType': '仅支持文件名为 aime.txt 或 felica.txt 的文本文件',
+        'ccb.err.aime': 'aime.txt 格式错误：未找到 20 位纯数字卡号',
+        'ccb.err.felicaLen': 'felica.txt 格式错误：需包含 16 位十六进制字符串',
+        'ccb.err.felicaConv': 'felica.txt 转换失败：请检查内容是否为 16 位十六进制',
+        'ccb.err.camera': '无法访问摄像头，请检查权限设置或使用手动输入',
+        'ccb.err.guid': '卡号必须为 20 位纯数字',
+        'ccb.err.keychip': 'KeyChip 必须以 A 开头，且为 11 位大写英数字',
+        'ccb.err.serverInvalid': '所选服务器无效，请重新选择',
+
+        'ccb.hint.guid': '仅限输入20位纯数字，或点击扫码按钮识别卡片',
+        'ccb.hint.keychip': '支持粘贴 15 位格式（如 A39E-01L99390821），会自动去符号并截为前 11 位；必须以 A 开头',
+
+        'ccb.confirm.switch': '确定将卡片{slot}设为主查分卡片吗？',
+        'ccb.confirm.unbindAll': '确定要解绑全部卡片吗？此操作不可撤销。',
+        'ccb.confirm.unbindCurrent': '确定要解绑当前卡片{slot}吗？此操作不可撤销。',
+
+        // 额外（可选，用于显示当前主卡/服务器）
+        'ccb.primary.now': '当前主卡片：卡片{slot}',
+        'ccb.nowUsing': '当前使用：卡片{slot} | 服务器：{server}',
+
+
         // 用户管理
         'userManager.title': '用户管理',
         'userManager.search': '搜索',
@@ -235,8 +303,6 @@ export default {
         'userSettings.unbindCard': '解绑卡片',
         'userSettings.goToBindHint': '前往游戏查分页面进行绑定',
         'userSettings.goToCcbPage': '前往查分页',
-        'ccb.card': '卡片',
-        'ccb.cardNotBound': '该卡片尚未绑定',
         'userSettings.shippingInfo': '收货绑定信息',
         'userSettings.recipient': '收件人',
         'userSettings.phone': '联系电话',
@@ -366,6 +432,73 @@ export default {
         'home.welcome': 'MAY THE LEAKER BE WITH YOU!',
         'home.selectFunction': 'Please select a function from the left menu',
         'home.announcementsLoading': 'Loading announcements...',
+
+        // ==== CCB (Score & Binding) ====
+        'ccb.pageTitle': 'Score Checker',
+        'ccb.cardManageTitle': 'Card Management',
+        'ccb.card': 'Card',
+        'ccb.status.bound': 'Bound',
+        'ccb.status.unbound': 'Unbound',
+        'ccb.primaryBadge': 'Primary',
+        'ccb.setPrimary': 'Set as Primary',
+        'ccb.unbindAll': 'Unbind All',
+        'ccb.unbindCurrent': 'Unbind Current Card',
+
+        'ccb.bind.title': 'Bind Card {slot}',
+        'ccb.server': 'Server',
+        'ccb.server.select': 'Please select server',
+        'ccb.guid.label': 'Card Number (20 digits)',
+        'ccb.scan': 'Scan',
+        'ccb.keychip.label': 'KeyChip (11 uppercase alphanumerics starting with A)',
+        'ccb.keychip.default': 'Use default KeyChip (A63E01A8888)',
+
+        'ccb.drop.title': 'Drop or click to choose a file to fill card number',
+        'ccb.drop.desc': 'Only aime.txt or felica.txt are supported',
+        'ccb.bind.submit': 'Bind Card {slot}',
+
+        'ccb.query.title': 'Query Score',
+        'ccb.chooseGame': 'Choose Game',
+        'ccb.notice.title': 'Notice',
+        'ccb.notice.html': 'Each query costs <b>1 point</b> and the result is shown as an image.<br>You must wait 10 seconds before the next query.<br><br>On some mobile browsers, the save button may not work. Long press the image to save.',
+        'ccb.query': 'Query',
+        'ccb.cancelQuery': 'Cancel',
+
+        'ccb.points.panelLabel': 'Points:',
+        'ccb.refresh': 'Refresh',
+        'ccb.refreshed': 'Refreshed',
+        'ccb.cooldown': 'You can query again in {sec}s',
+
+        'ccb.result.title': 'Result',
+        'ccb.result.empty': 'No result yet. Please run a query first.',
+        'ccb.saveImage': 'Save Image',
+
+        // Messages / Errors / Confirms
+        'ccb.msg.bindSuccess': 'Bind succeeded',
+        'ccb.msg.bindFailed': 'Bind failed',
+        'ccb.msg.unbindAllSuccess': 'All cards unbound',
+        'ccb.msg.unbindSuccess': 'Current card unbound',
+        'ccb.msg.switchSuccess': 'Set successfully',
+        'ccb.msg.switchFailed': 'Set failed',
+
+        'ccb.err.fileType': 'Only aime.txt or felica.txt text files are supported',
+        'ccb.err.aime': 'aime.txt format error: 20-digit number not found',
+        'ccb.err.felicaLen': 'felica.txt format error: 16 hex characters required',
+        'ccb.err.felicaConv': 'felica.txt conversion failed: please check the 16-hex content',
+        'ccb.err.camera': 'Cannot access camera. Check permission or use manual input.',
+        'ccb.err.guid': 'Card number must be 20 digits',
+        'ccb.err.keychip': 'KeyChip must start with A and be 11 uppercase alphanumerics',
+        'ccb.err.serverInvalid': 'Selected server is invalid. Please choose again.',
+
+        'ccb.hint.guid': 'Enter exactly 20 digits, or use the scan button',
+        'ccb.hint.keychip': 'Pasting 15-char format (e.g. A39E-01L99390821) is supported; symbols will be removed and trimmed to the first 11; must start with A.',
+
+        'ccb.confirm.switch': 'Set Card {slot} as Primary?',
+        'ccb.confirm.unbindAll': 'Unbind all cards? This cannot be undone.',
+        'ccb.confirm.unbindCurrent': 'Unbind current card {slot}? This cannot be undone.',
+
+        'ccb.primary.now': 'Primary Card: Card {slot}',
+        'ccb.nowUsing': 'Using: Card {slot} | Server: {server}',
+
 
         // 用户管理
         'userManager.title': 'User Manager',
@@ -558,8 +691,6 @@ export default {
         'userSettings.unbindCard': 'Unbind Card',
         'userSettings.goToBindHint': 'Go to CCB page to bind',
         'userSettings.goToCcbPage': 'Go to CCB Page',
-        'ccb.card': 'Card',
-        'ccb.cardNotBound': 'This card is not bound',
         'userSettings.shippingInfo': 'Shipping Info',
         'userSettings.recipient': 'Recipient',
         'userSettings.phone': 'Phone',
@@ -689,6 +820,72 @@ export default {
         'home.welcome': 'MAY THE LEAKER BE WITH YOU!',
         'home.selectFunction': '左のメニューから機能を選択してください',
         'home.announcementsLoading': 'お知らせを読み込み中...',
+
+        // ==== CCB（スコア確認 & バインド）====
+        'ccb.pageTitle': 'スコア確認',
+        'ccb.cardManageTitle': 'カード管理',
+        'ccb.card': 'カード',
+        'ccb.status.bound': 'バインド済み',
+        'ccb.status.unbound': '未バインド',
+        'ccb.primaryBadge': '主カード',
+        'ccb.setPrimary': '主カードに設定',
+        'ccb.unbindAll': 'すべて解除',
+        'ccb.unbindCurrent': '現在のカードを解除',
+
+        'ccb.bind.title': 'カード{slot}をバインド',
+        'ccb.server': 'サーバー',
+        'ccb.server.select': 'サーバーを選択してください',
+        'ccb.guid.label': 'ゲームカード番号（20桁の数字）',
+        'ccb.scan': 'スキャン入力',
+        'ccb.keychip.label': 'KeyChip（Aで始まる大文字英数字11桁）',
+        'ccb.keychip.default': 'デフォルト KeyChip（A63E01A8888）を使用',
+
+        'ccb.drop.title': 'ファイルをドラッグ＆ドロップ、またはクリックして選択',
+        'ccb.drop.desc': 'aime.txt または felica.txt のみ対応',
+        'ccb.bind.submit': 'カード{slot}をバインド',
+
+        'ccb.query.title': 'スコア照会',
+        'ccb.chooseGame': 'ゲームを選択',
+        'ccb.notice.title': 'お知らせ',
+        'ccb.notice.html': '照会は<b>1ポイント</b>消費し、結果は画像で表示されます。<br>再照会は10秒後に可能です。<br><br>モバイルの一部ブラウザでは保存ボタンが効かない場合があります。長押しで保存してください。',
+        'ccb.query': '照会',
+        'ccb.cancelQuery': 'キャンセル',
+
+        'ccb.points.panelLabel': '現在のポイント：',
+        'ccb.refresh': '更新',
+        'ccb.refreshed': '更新しました',
+        'ccb.cooldown': '{sec} 秒後に再照会可能',
+
+        'ccb.result.title': '照会結果',
+        'ccb.result.empty': '結果がありません。まず照会してください。',
+        'ccb.saveImage': '画像を保存',
+
+        // メッセージ / エラー / 確認
+        'ccb.msg.bindSuccess': 'バインド成功',
+        'ccb.msg.bindFailed': 'バインド失敗',
+        'ccb.msg.unbindAllSuccess': 'すべて解除しました',
+        'ccb.msg.unbindSuccess': '現在のカードを解除しました',
+        'ccb.msg.switchSuccess': '設定成功',
+        'ccb.msg.switchFailed': '設定失敗',
+
+        'ccb.err.fileType': 'aime.txt または felica.txt のテキストのみ対応',
+        'ccb.err.aime': 'aime.txt の形式エラー：20桁の数字が見つかりません',
+        'ccb.err.felicaLen': 'felica.txt の形式エラー：16桁の16進数が必要です',
+        'ccb.err.felicaConv': 'felica.txt の変換に失敗しました：内容をご確認ください',
+        'ccb.err.camera': 'カメラにアクセスできません。権限を確認するか手入力をご利用ください。',
+        'ccb.err.guid': 'カード番号は20桁の数字である必要があります',
+        'ccb.err.keychip': 'KeyChip は A で始まる大文字英数字11桁です',
+        'ccb.err.serverInvalid': '選択したサーバーが無効です。もう一度選択してください。',
+
+        'ccb.hint.guid': '20桁の数字のみ入力、またはスキャンボタンで読み取り',
+        'ccb.hint.keychip': '15桁形式（例：A39E-01L99390821）の貼り付けに対応。記号を除去して先頭11桁に整形します。Aで始まる必要があります。',
+
+        'ccb.confirm.switch': 'カード{slot}を主カードに設定しますか？',
+        'ccb.confirm.unbindAll': 'すべてのカードを解除しますか？この操作は取り消せません。',
+        'ccb.confirm.unbindCurrent': '現在のカード{slot}を解除しますか？この操作は取り消せません。',
+
+        'ccb.primary.now': '現在の主カード：カード{slot}',
+        'ccb.nowUsing': '使用中：カード{slot} | サーバー：{server}',
 
         // 用户管理
         'userManager.title': 'ユーザー管理',
@@ -881,8 +1078,6 @@ export default {
         'userSettings.unbindCard': 'カードのバインド解除',
         'userSettings.goToBindHint': 'スコア確認ページでバインド',
         'userSettings.goToCcbPage': 'スコア確認ページへ',
-        'ccb.card': 'カード',
-        'ccb.cardNotBound': 'このカードはバインドされていません',
         'userSettings.shippingInfo': '配送情報',
         'userSettings.recipient': '受取人',
         'userSettings.phone': '電話番号',
