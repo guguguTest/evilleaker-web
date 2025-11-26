@@ -19,6 +19,18 @@ export default [
                 }
             },
             {
+                name: 'Tools',
+                path: '/tools',
+                component: () => import('@/views/Tools.vue'),
+                meta: {
+                    // 只要能登录且 BS0 就能看（与其它功能页一致）
+                    ...PRESET_LOGIN_BS0,
+                    title: 'sidebar.tools',
+                    icon: 'fas fa-tools me-2',
+                    rule: 'tools'
+                }
+            },
+            {
                 name: 'Ccb',
                 path: '/ccb',
                 component: () => import('@/views/Ccb.vue'),
