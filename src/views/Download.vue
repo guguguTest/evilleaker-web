@@ -1,4 +1,3 @@
-<!-- src/views/Download.vue -->
 <template>
   <div class="section">
     <h1 class="page-title" data-i18n="download.title">下载中心</h1>
@@ -15,23 +14,21 @@
     <div v-else-if="!hasAccess" class="login-required-container">
       <div class="login-required-card">
         <div class="login-required-icon">
-          <i class="fas fa-ban"></i>
+          <i class="fas fa-lock"></i>
         </div>
-        <h2>需要权限</h2>
-        <p>当前账号没有访问下载中心的权限，请检查登录状态或联系管理员。</p>
-        <button type="button" class="login-btn" @click="goHome">
-          <i class="fas fa-home me-2"></i>
-          返回首页
-        </button>
+        <h3>需要登录后访问</h3>
+        <p>该页面仅对登录用户开放，请先登录或联系管理员开通权限。</p>
+        <div class="login-required-actions">
+          <button type="button" class="btn btn-primary" @click="goLogin">去登录</button>
+          <button type="button" class="btn btn-outline-secondary" @click="goHome">返回首页</button>
+        </div>
       </div>
     </div>
 
     <!-- 加载失败 -->
     <div v-else-if="errorMsg" class="download-error">
       <p class="mb-3">{{ errorMsg }}</p>
-      <button type="button" class="btn btn-outline-primary btn-sm" @click="reload">
-        重新加载
-      </button>
+      <button type="button" class="btn btn-outline-primary btn-sm" @click="reload">重新加载</button>
     </div>
 
     <!-- 正常内容 -->
@@ -63,16 +60,12 @@
             <tbody>
             <tr
                 v-for="item in gameDownloads"
-                :key="item.id"
+                :key="item.id || item._id"
                 class="download-row"
                 @click="handleRowClick(item)"
             >
               <td data-label="游戏名称">
-                  <span
-                      v-if="hasDownloadAccess(item)"
-                      class="download-link"
-                      @click.stop="handleRowClick(item)"
-                  >
+                  <span v-if="hasDownloadAccess(item)" class="download-link" @click.stop="handleRowClick(item)">
                     <i class="fas fa-link me-2"></i>
                     {{ item.title }}
                   </span>
@@ -82,35 +75,23 @@
                   </span>
               </td>
               <td data-label="版本">{{ item.version || '-' }}</td>
-              <td data-label="文件数">{{ item.file_count || '-' }}</td>
+              <td data-label="文件数">{{ item.file_count ?? item.files_count ?? '-' }}</td>
               <td data-label="访问权限">
-                  <span class="access-badge">
-                    {{ formatAccessLevel(item) }}
-                  </span>
+                <!-- ✅ 最小改动：绑定等级类名 -->
+                <span class="access-badge" :class="rankClass(item)">{{ formatAccessLevel(item) }}</span>
               </td>
               <td data-label="特殊访问权限">
-                  <span class="special-badge" v-if="item.special_group">
-                    {{ formatSpecialGroup(item) }}
-                  </span>
-                <span class="text-muted" v-else>无</span>
+                <span v-if="item.special_group" class="special-badge" :class="specialClass(item)">{{ formatSpecialGroup(item) }}</span>
+                <span v-else class="text-muted">无</span>
               </td>
               <td data-label="所需积分">
-                  <span
-                      v-if="item.required_points && item.required_points > 0"
-                      class="points-badge"
-                  >
-                    <i class="fas fa-coins me-1"></i>
-                    {{ formatPoints(item) }}
-                  </span>
-                <span v-else class="text-muted">免费</span>
+                <span class="points-badge">{{ formatPoints(item) }}</span>
               </td>
             </tr>
             </tbody>
           </table>
         </div>
-        <div v-else class="download-empty">
-          暂无可用的游戏下载。
-        </div>
+        <div v-else class="download-empty">暂无可用的游戏下载。</div>
       </div>
 
       <!-- 存档下载 -->
@@ -140,16 +121,12 @@
             <tbody>
             <tr
                 v-for="item in archiveDownloads"
-                :key="item.id"
+                :key="item.id || item._id"
                 class="download-row"
                 @click="handleRowClick(item)"
             >
               <td data-label="存档名称">
-                  <span
-                      v-if="hasDownloadAccess(item)"
-                      class="download-link"
-                      @click.stop="handleRowClick(item)"
-                  >
+                  <span v-if="hasDownloadAccess(item)" class="download-link" @click.stop="handleRowClick(item)">
                     <i class="fas fa-link me-2"></i>
                     {{ item.title }}
                   </span>
@@ -159,42 +136,30 @@
                   </span>
               </td>
               <td data-label="版本">{{ item.version || '-' }}</td>
-              <td data-label="文件数">{{ item.file_count || '-' }}</td>
+              <td data-label="文件数">{{ item.file_count ?? item.files_count ?? '-' }}</td>
               <td data-label="访问权限">
-                  <span class="access-badge">
-                    {{ formatAccessLevel(item) }}
-                  </span>
+                <!-- ✅ 最小改动：绑定等级类名 -->
+                <span class="access-badge" :class="rankClass(item)">{{ formatAccessLevel(item) }}</span>
               </td>
               <td data-label="特殊访问权限">
-                  <span class="special-badge" v-if="item.special_group">
-                    {{ formatSpecialGroup(item) }}
-                  </span>
-                <span class="text-muted" v-else>无</span>
+                <span v-if="item.special_group" class="special-badge" :class="specialClass(item)">{{ formatSpecialGroup(item) }}</span>
+                <span v-else class="text-muted">无</span>
               </td>
               <td data-label="所需积分">
-                  <span
-                      v-if="item.required_points && item.required_points > 0"
-                      class="points-badge"
-                  >
-                    <i class="fas fa-coins me-1"></i>
-                    {{ formatPoints(item) }}
-                  </span>
-                <span v-else class="text-muted">免费</span>
+                <span class="points-badge">{{ formatPoints(item) }}</span>
               </td>
             </tr>
             </tbody>
           </table>
         </div>
-        <div v-else class="download-empty">
-          暂无可用的存档下载。
-        </div>
+        <div v-else class="download-empty">暂无可用的存档下载。</div>
       </div>
 
       <!-- 其他资源 -->
       <div class="section download-section">
         <div class="download-section-header">
           <h2 class="section-title">
-            <i class="fas fa-folder-open me-2"></i>
+            <i class="fas fa-box-open me-2"></i>
             <span>其他资源</span>
           </h2>
           <div v-if="otherLastUpdate" class="download-last-update">
@@ -217,16 +182,12 @@
             <tbody>
             <tr
                 v-for="item in otherDownloads"
-                :key="item.id"
+                :key="item.id || item._id"
                 class="download-row"
                 @click="handleRowClick(item)"
             >
               <td data-label="资源名称">
-                  <span
-                      v-if="hasDownloadAccess(item)"
-                      class="download-link"
-                      @click.stop="handleRowClick(item)"
-                  >
+                  <span v-if="hasDownloadAccess(item)" class="download-link" @click.stop="handleRowClick(item)">
                     <i class="fas fa-link me-2"></i>
                     {{ item.title }}
                   </span>
@@ -236,88 +197,113 @@
                   </span>
               </td>
               <td data-label="版本">{{ item.version || '-' }}</td>
-              <td data-label="文件数">{{ item.file_count || '-' }}</td>
+              <td data-label="文件数">{{ item.file_count ?? item.files_count ?? '-' }}</td>
               <td data-label="访问权限">
-                  <span class="access-badge">
-                    {{ formatAccessLevel(item) }}
-                  </span>
+                <!-- ✅ 最小改动：绑定等级类名 -->
+                <span class="access-badge" :class="rankClass(item)">{{ formatAccessLevel(item) }}</span>
               </td>
               <td data-label="特殊访问权限">
-                  <span class="special-badge" v-if="item.special_group">
-                    {{ formatSpecialGroup(item) }}
-                  </span>
-                <span class="text-muted" v-else>无</span>
+                <span v-if="item.special_group" class="special-badge" :class="specialClass(item)">{{ formatSpecialGroup(item) }}</span>
+                <span v-else class="text-muted">无</span>
               </td>
               <td data-label="所需积分">
-                  <span
-                      v-if="item.required_points && item.required_points > 0"
-                      class="points-badge"
-                  >
-                    <i class="fas fa-coins me-1"></i>
-                    {{ formatPoints(item) }}
-                  </span>
-                <span v-else class="text-muted">免费</span>
+                <span class="points-badge">{{ formatPoints(item) }}</span>
               </td>
             </tr>
             </tbody>
           </table>
         </div>
-        <div v-else class="download-empty">
-          暂无可用的其他资源。
-        </div>
+        <div v-else class="download-empty">暂无可用的其他资源。</div>
       </div>
 
       <!-- 说明 -->
-      <div class="section download-section download-note-section">
-        <h2 class="section-title">
-          <i class="fas fa-info-circle me-2"></i>
-          <span>下载说明</span>
-        </h2>
-        <ul class="download-notes">
-          <li>部分资源可能需要登录后才能下载，请先登录账号。</li>
-          <li>部分资源需要达到指定用户组或特殊用户组才可访问。</li>
-          <li>带有积分消耗的资源，下载前请确认自己的积分是否足够。</li>
-          <li>如遇下载失败或速度过慢，可以稍后重试或更换浏览器。</li>
-        </ul>
+      <div class="section download-section">
+        <div class="download-section-header">
+          <h2 class="section-title">
+            <i class="fas fa-info-circle me-2"></i>
+            <span>说明与使用建议</span>
+          </h2>
+        </div>
+        <div class="download-note">
+          <ul>
+            <li>部分资源可能仅对指定用户组或特殊权限开放，若想申请访问，请联系管理员。</li>
+            <li>下载前请确认自己的账户积分是否足够；付费资源会在下载前扣减积分。</li>
+            <li>为保证下载体验，建议在网络稳定的环境下进行下载。</li>
+            <li>如遇到链接失效或文件损坏，请联系管理员协助处理。</li>
+            <li>为了防止滥用，服务端会对频繁下载行为进行限制，请合理安排下载时间。</li>
+            <li>请遵守社区规范，不要将下载链接公开传播；如需转载请联系管理员。</li>
+            <li>下载的资源仅供学习和测试使用，禁止用于商业或非法用途。</li>
+            <li>下载页会不定期更新，如需及时了解更新内容，可关注公告或联系我们。</li>
+            <li>移动端查看时，表格支持横向滚动以避免内容挤压；如显示异常可切换至桌面端浏览器。</li>
+          </ul>
+        </div>
       </div>
     </div>
   </div>
 </template>
 
 <script setup>
-import {ref, computed, onMounted} from 'vue';
-import {useRouter} from 'vue-router';
-import {useAuthStore} from '@/stores/auth';
-import {
-  checkDownloadPermission,
-  fetchDownloads,
-  accessDownload,
-} from '@/api/download';
-import {
-  showErrorMessage,
-  showInfoMessage,
-  showSuccessMessage,
-} from '@/utils/messageBox.js';
+import { ref, computed, onMounted } from 'vue';
+import { useRouter } from 'vue-router';
+import { useAuthStore } from '@/stores/auth';
+import { fetchDownloads, accessDownload } from '@/api/download';
+import { showErrorMessage, showInfoMessage } from '@/utils/messageBox.js';
 
 const router = useRouter();
-const authStore = useAuthStore();
+const auth = useAuthStore();
 
 const loading = ref(true);
-const hasAccess = ref(true);
 const errorMsg = ref('');
+const hasAccess = ref(true); // 允许访问列表页
 
 const downloads = ref([]);
 
-// 从登录信息里取用户等级和特殊组
-const userRank = computed(() => authStore.user?.user_rank ?? 0);
-const userSpecialGroup = computed(() => authStore.user?.rankSp ?? 0);
+// ===== 用户信息（保持原始） =====
+const userRank = computed(() => Number(auth.user?.user_rank ?? auth.user?.rank ?? 0));
+const userSpecialGroupRaw = computed(() => auth.user?.special_group ?? auth.user?.rankSp ?? '');
 
-// 特殊组映射（和原版一致）
-const SPECIAL_GROUP_MAP = {
-  maimoller: 1,
-  coadmin: 2,
-};
+// 统一特殊组显示（不影响原逻辑）
+const SG_ALIAS = { '1': 'maimoller', '2': 'coadmin', 'maimoller': 'maimoller', 'coadmin': 'coadmin' };
+function normSg(v) {
+  const s = String(v ?? '').trim().toLowerCase();
+  return SG_ALIAS[s] || s;
+}
+const userSg = computed(() => normSg(userSpecialGroupRaw.value));
 
+// ===== 分类（保持最原始） =====
+const gameDownloads = computed(() =>
+    downloads.value.filter(d => (d?.category ?? '').toString().toLowerCase() === 'game')
+);
+const archiveDownloads = computed(() =>
+    downloads.value.filter(d => (d?.category ?? '').toString().toLowerCase() === 'archive')
+);
+const otherDownloads = computed(() =>
+    downloads.value.filter(d => (d?.category ?? '').toString().toLowerCase() === 'other')
+);
+
+// 最后更新时间
+function getLastUpdate(list) {
+  if (!Array.isArray(list) || !list.length) return '';
+  const times = list
+      .map(d => d.last_update || d.updated_at || d.created_at)
+      .filter(Boolean)
+      .map(s => new Date(s).getTime())
+      .filter(t => !isNaN(t));
+  if (!times.length) return '';
+  const latest = Math.max(...times);
+  const dt = new Date(latest);
+  const yyyy = dt.getFullYear();
+  const mm = String(dt.getMonth() + 1).padStart(2, '0');
+  const dd = String(dt.getDate()).padStart(2, '0');
+  const hh = String(dt.getHours()).padStart(2, '0');
+  const mi = String(dt.getMinutes()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd} ${hh}:${mi}`;
+}
+const gameLastUpdate = computed(() => getLastUpdate(gameDownloads.value));
+const archiveLastUpdate = computed(() => getLastUpdate(archiveDownloads.value));
+const otherLastUpdate = computed(() => getLastUpdate(otherDownloads.value));
+
+// ===== 权限显示 & 校验（与原版一致） =====
 const accessLevelNames = {
   '-1': '不限',
   '0': '普通用户',
@@ -327,168 +313,98 @@ const accessLevelNames = {
   '4': '贵宾用户',
   '5': '系统管理员',
 };
+const specialGroupNames = { maimoller: 'maimoller', coadmin: '协同管理员' };
 
-const specialGroupNames = {
-  maimoller: 'maimoller',
-  coadmin: '协同管理员',
-};
-
-// 与后端一致的排序：sort_order 升序，created_at 降序
-function compareBySortOrderAndDate(a, b) {
-  const sa = Number((a && a.sort_order) || 0);
-  const sb = Number((b && b.sort_order) || 0);
-  if (sa !== sb) return sa - sb;
-  const ta = a && a.created_at ? new Date(a.created_at).getTime() : 0;
-  const tb = b && b.created_at ? new Date(b.created_at).getTime() : 0;
-  return (isFinite(tb) ? tb : 0) - (isFinite(ta) ? ta : 0);
+function formatAccessLevel(download) {
+  const lvl = String(download?.access_level ?? download?.rank ?? 0);
+  return accessLevelNames[lvl] || accessLevelNames['0'];
+}
+function formatSpecialGroup(download) {
+  const sg = normSg(download?.special_group);
+  return sg ? (specialGroupNames[sg] || sg) : '无';
+}
+function formatPoints(download) {
+  const p = Number(download?.required_points ?? download?.points ?? 0);
+  return p > 0 ? String(p) : '无';
 }
 
-// 分类后的三个列表
-const gameDownloads = computed(() =>
-    downloads.value
-        .filter((d) => d.category === 'game')
-        .slice()
-        .sort(compareBySortOrderAndDate),
-);
-
-const archiveDownloads = computed(() =>
-    downloads.value
-        .filter((d) => d.category === 'archive')
-        .slice()
-        .sort(compareBySortOrderAndDate),
-);
-
-const otherDownloads = computed(() =>
-    downloads.value
-        .filter((d) => d.category === 'other')
-        .slice()
-        .sort(compareBySortOrderAndDate),
-);
-
-// 计算分类的“最后更新”时间（优先 last_update / updated_at / created_at）
-function getLastUpdate(list) {
-  if (!Array.isArray(list) || !list.length) return '';
-  const latest = list.reduce((latestDate, item) => {
-    const dateStr = item.last_update || item.updated_at || item.created_at;
-    const d = dateStr ? new Date(dateStr) : new Date(0);
-    return d > latestDate ? d : latestDate;
-  }, new Date(0));
-
-  return latest > new Date(0) ? latest.toLocaleDateString('zh-CN') : '';
+/** ✅ 最小新增：根据 access_level 返回类名，让徽章能变色 */
+function rankClass(download) {
+  const lvl = Number(download?.access_level ?? download?.rank ?? 0);
+  if (Number.isNaN(lvl)) return 'rank-0';
+  if (lvl < 0) return 'rank-unlimited';
+  return `rank-${lvl}`; // rank-0 ~ rank-5
 }
 
-const gameLastUpdate = computed(() => getLastUpdate(gameDownloads.value));
-const archiveLastUpdate = computed(() => getLastUpdate(archiveDownloads.value));
-const otherLastUpdate = computed(() => getLastUpdate(otherDownloads.value));
+function specialClass(download) {
+  const sg = normSg(download?.special_group);
+  if (!sg) return '';
+  if (sg === 'maimoller') return 'special-maimoller';
+  if (sg === 'coadmin') return 'special-coadmin';
+  return `special-${sg}`;
+}
 
-// 检查单个下载项权限
+/** 判定是否可访问：
+ *  - access_level >= 0 时：userRank >= access_level
+ *  - special_group 存在时：userSg == special_group
+ */
 function hasDownloadAccess(download) {
   let ok = true;
-  const rank = userRank.value || 0;
-  const sg = userSpecialGroup.value || 0;
-
-  if (
-      download.access_level !== undefined &&
-      download.access_level !== null &&
-      download.access_level >= 0
-  ) {
-    ok = rank >= download.access_level;
-  }
-
-  if (download.special_group && download.special_group !== '') {
-    const required = SPECIAL_GROUP_MAP[download.special_group] || 0;
-    ok = ok && sg === required; // 和原版保持同样的“等于”逻辑
-  }
-
+  const level = Number(download?.access_level ?? download?.rank ?? -1);
+  if (!Number.isNaN(level) && level >= 0) ok = ok && (userRank.value >= level);
+  const requiredSg = normSg(download?.special_group);
+  if (requiredSg) ok = ok && (userSg.value === requiredSg);
   return ok;
 }
 
-function formatAccessLevel(download) {
-  const key = String(download.access_level ?? 0);
-  return accessLevelNames[key] || accessLevelNames['0'];
-}
-
-function formatSpecialGroup(download) {
-  if (!download.special_group) return '无';
-  return specialGroupNames[download.special_group] || download.special_group;
-}
-
-function formatPoints(download) {
-  if (download.required_points && download.required_points > 0) {
-    return String(download.required_points);
-  }
-  return '无';
-}
-
-// 行点击：权限 + 积分校验 + 跳详情页
+// 行点击：权限校验 → 积分确认 → 记录访问 → 跳详情（params 传 id）
 async function handleRowClick(download) {
-  if (!hasDownloadAccess(download)) {
-    showErrorMessage('您的用户组级别无法访问该资源');
-    return;
-  }
-
-  const id = download.id;
-
-  // 需要积分时，先确认 + 调用 /api/downloads/:id/access
-  if (download.required_points && download.required_points > 0) {
-    const ok = window.confirm(
-        `访问此资源需要 ${download.required_points} 积分，确定要继续吗？`,
-    );
-    if (!ok) return;
-
-    try {
-      const result = await accessDownload(id);
-
-      if (result && result.success) {
-        showSuccessMessage(`已扣除 ${download.required_points} 积分`);
-        setTimeout(() => {
-          router.push({name: 'DownloadDetail', params: {id}});
-        }, 800);
-      } else {
-        showErrorMessage(result?.error || '访问资源失败');
-      }
-    } catch (error) {
-      console.error('访问资源错误:', error);
-      showErrorMessage('访问资源失败: ' + (error?.message || '未知错误'));
+  try {
+    if (!hasDownloadAccess(download)) {
+      showInfoMessage('权限不足或资源不可用');
+      return;
     }
-
-    return;
+    const id = String(download?.id ?? download?._id ?? download?.download_id ?? download?.file_id ?? '');
+    if (!id) {
+      showErrorMessage('资源缺少ID，无法打开详情');
+      return;
+    }
+    const pointCost = Number(download?.required_points ?? download?.points ?? 0);
+    if (pointCost > 0) {
+      const ok = confirm(`下载该资源需要消耗 ${pointCost} 积分，是否继续？`);
+      if (!ok) return;
+    }
+    try { await accessDownload(id); } catch (_) {}
+    router.push({ name: 'DownloadDetail', params: { id } });
+  } catch (e) {
+    console.error('[download] 跳转失败', e);
+    showErrorMessage(e?.message || '无法打开详情页，请稍后再试');
   }
-
-  // 不需要积分，直接跳转详情页
-  router.push({name: 'DownloadDetail', params: {id}});
 }
 
-// 返回首页按钮
-function goHome() {
-  router.push('/home');
-}
-
-function reload() {
-  loading.value = true;
-  errorMsg.value = '';
-  init();
+// 初始化：只做最小提取
+function pickArray(res) {
+  if (Array.isArray(res)) return res;
+  if (Array.isArray(res?.data)) return res.data;
+  if (Array.isArray(res?.list)) return res.list;
+  if (Array.isArray(res?.items)) return res.items;
+  if (Array.isArray(res?.data?.list)) return res.data.list;
+  if (Array.isArray(res?.data?.items)) return res.data.items;
+  if (Array.isArray(res?.data?.data)) return res.data.data;
+  return [];
 }
 
 async function init() {
   try {
-    // 访问权限检查
-    try {
-      const perm = await checkDownloadPermission();
-      if (perm && perm.hasAccess === false) {
-        hasAccess.value = false;
-        loading.value = false;
-        return;
-      }
-    } catch (e) {
-      console.warn('[download] 权限检查失败，默认允许访问', e);
-    }
-
-    const list = await fetchDownloads();
-    downloads.value = Array.isArray(list) ? list : [];
-    if (!downloads.value.length) {
-      showInfoMessage('当前暂无可用的下载资源。');
-    }
+    errorMsg.value = '';
+    loading.value = true;
+    const res = await fetchDownloads();
+    const list = pickArray(res).map(raw => ({
+      ...raw,
+      id: raw.id ?? raw._id ?? raw.download_id ?? raw.file_id ?? raw.uuid ?? raw.slug ?? undefined,
+      title: raw.title ?? raw.name ?? '未命名资源',
+    }));
+    downloads.value = list;
   } catch (e) {
     console.error('[download] 加载下载列表失败', e);
     errorMsg.value = '下载列表加载失败，请稍后重试。';
@@ -497,249 +413,101 @@ async function init() {
   }
 }
 
-onMounted(() => {
-  init();
-});
+onMounted(() => { init(); });
+
+// 跳转
+function goLogin() { router.push({ name: 'Login' }); }
+function goHome() { router.push({ path: '/' }); }
+function reload() { init(); }
 </script>
 
 <style scoped>
-/* 下载页整体容器 */
+/* 容器 */
 .section.download-section {
-  margin-bottom: 3rem;
-  background: #ffffff;
-  border-radius: 16px;
-  padding: 2rem;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.06);
-  position: relative;
-  overflow: hidden;
+  background: #fff;
+  border-radius: 14px;
   border: 1px solid #e9ecef;
+  box-shadow: 0 4px 20px rgba(0,0,0,.06);
+  padding: 1.25rem 1rem;
+  margin-bottom: 1.25rem;
 }
 
-.section.download-section::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: radial-gradient(circle at top left, rgba(86, 197, 255, 0.12), transparent 55%),
-  radial-gradient(circle at bottom right, rgba(111, 66, 193, 0.07), transparent 60%);
-  opacity: 0.6;
-  pointer-events: none;
-}
-
-.section.download-section > * {
-  position: relative;
-  z-index: 1;
-}
-
-/* 标题与头部 */
 .download-section-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 0.75rem;
-  margin-bottom: 1.25rem;
+  gap: .75rem;
+  margin-bottom: .5rem;
 }
 
 .section-title {
-  font-size: 1.05rem;
-  font-weight: 600;
-  color: #212529;
-  display: flex;
-  align-items: center;
-  gap: 0.4rem;
+  font-size: 1.1rem;
+  font-weight: 800;
+  color: #1f2937;
   margin: 0;
 }
 
-.section-title i {
-  color: #4c6fff;
-}
-
 .download-last-update {
-  font-size: 0.85rem;
-  color: #868e96;
+  font-size: .85rem;
+  color: #6b7280;
 }
 
-.download-last-update span {
-  color: #495057;
-}
-
-/* 加载状态 */
-.download-loading {
-  padding: 3rem 0;
-  text-align: center;
-  color: #495057;
-}
-
-/* 错误状态 */
-.download-error {
-  padding: 2rem;
-  margin-top: 1rem;
-  border-radius: 12px;
-  border: 1px dashed #ffc9c9;
-  background: #fff5f5;
-  color: #c92a2a;
-}
-
-/* 登录 / 权限不足 */
-.login-required-container {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  padding: 3rem 0;
-}
-
-.login-required-card {
-  text-align: center;
-  max-width: 420px;
-  padding: 2rem 2.5rem;
-  border-radius: 24px;
-  background: radial-gradient(circle at top, #ffffff 0%, #f8f9fa 100%);
-  box-shadow: 0 12px 40px rgba(15, 23, 42, 0.15);
-  border: 1px solid rgba(222, 226, 230, 0.8);
-}
-
-.login-required-card h2 {
-  margin-top: 1rem;
-  font-weight: 700;
-  color: #212529;
-  font-size: 1.15rem;
-}
-
-.login-required-card p {
-  margin-bottom: 0;
-  margin-top: 0.5rem;
-  color: #868e96;
-  font-size: 0.9rem;
-}
-
-.login-required-icon {
-  width: 72px;
-  height: 72px;
-  margin: 0 auto 1rem;
-  border-radius: 50%;
-  background: #fff5f5;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #fa5252;
-  font-size: 2rem;
-}
-
-.login-btn {
-  margin-top: 1.5rem;
-  border: none;
-  border-radius: 999px;
-  padding: 0.5rem 1.5rem;
-  font-size: 0.9rem;
-  background: linear-gradient(135deg, #4c6fff, #667eea);
-  color: #ffffff;
-  font-weight: 600;
-  display: inline-flex;
-  align-items: center;
-  gap: 0.4rem;
-  box-shadow: 0 6px 18px rgba(76, 111, 255, 0.45);
-  cursor: pointer;
-}
-
-.login-btn:hover {
-  box-shadow: 0 10px 24px rgba(76, 111, 255, 0.6);
-  transform: translateY(-1px);
-}
-
-/* 表格 */
+/* 表格外层容器：移动端可横向滚动 */
 .download-table-wrapper {
-  width: 100%;
+  border: 1px solid #e9ecef;
+  border-radius: 12px;
   overflow-x: auto;
+  overflow-y: hidden;
   -webkit-overflow-scrolling: touch;
+  touch-action: pan-x;
+  box-shadow: 0 2px 12px rgba(0,0,0,.06);
 }
 
 .download-table {
   width: 100%;
+  min-width: 920px; /* 6列保守值 */
   border-collapse: collapse;
-  background: #ffffff;
+  background: #fff;
 }
 
-/* 表头背景浅灰 + 深色文字 */
-.download-table thead {
-  background: linear-gradient(90deg, #f8f9fa, #e9ecef);
+.download-table thead th {
+  background: #f8fafc;
+  color: #334155;
+  font-weight: 800;
+  letter-spacing: .3px;
+  font-size: .86rem;
 }
 
 .download-table th,
 .download-table td {
-  padding: 0.9rem 0.75rem;
-  border-bottom: 1px solid #e9ecef;
-  text-align: left;
+  padding: .75rem .9rem;
+  border-bottom: 1px solid #f1f5f9;
   vertical-align: middle;
 }
 
-.download-table th {
-  font-weight: 600;
-  text-transform: none;
-  font-size: 0.85rem;
-  letter-spacing: 0.3px;
-  position: relative;
-  color: #343a40; /* 深色标题文字 */
-}
-
-.download-table th::after {
-  content: '';
-  position: absolute;
-  left: 0;
-  bottom: 0;
-  width: 32px;
-  height: 2px;
-  border-radius: 999px;
-  background: linear-gradient(90deg, #4c6fff, #845ef7);
-}
-
-/* 行 hover 效果 */
-.download-row {
-  cursor: pointer;
-  transition: background-color 0.15s ease,
-  transform 0.1s ease,
-  box-shadow 0.15s ease;
-}
-
 .download-row:hover {
-  background-color: rgba(59, 130, 246, 0.04);
-  transform: translateY(-1px);
+  background: rgba(102,126,234,.06);
 }
 
-/* 关键：下载入口链接样式
-   —— 完全对齐 DownloadDetail.vue 里的 .external-link */
 .download-link {
   color: #667eea;
+  font-weight: 700;
   text-decoration: none;
-  font-weight: 600;
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  padding: 6px 12px;
-  border-radius: 6px;
-  background: linear-gradient(
-      135deg,
-      transparent 0%,
-      rgba(102, 126, 234, 0.05) 100%
-  );
-  transition: all 0.3s ease;
-  white-space: nowrap;
+  background: #f1f5ff;
+  padding: 0.25rem 0.5rem;
+  border-radius: 8px;
+  transition: all .2s ease;
 }
-
 .download-link:hover {
   color: #764ba2;
-  background: linear-gradient(
-      135deg,
-      rgba(102, 126, 234, 0.1) 0%,
-      rgba(118, 75, 162, 0.1) 100%
-  );
-  transform: translateX(3px);
-  box-shadow: 0 2px 8px rgba(102, 126, 234, 0.2);
+  background: #e8ecff;
+  transform: translateX(2px);
 }
+.download-link i { font-size: 0.9rem; }
 
-.download-link i {
-  font-size: 0.9rem;
-}
-
-/* badge：访问权限 */
+/* 徽章基础：不换行/不挤压，保留你原有灰色默认样式 */
 .access-badge {
   display: inline-flex;
   align-items: center;
@@ -750,9 +518,16 @@ onMounted(() => {
   background: #e9ecef;
   color: #495057;
   border: 1px solid transparent;
+
+  white-space: nowrap;
+  word-break: keep-all;
+  flex-shrink: 0;
+  min-width: 0;
+
+  /* 👉 所有等级：增强文字阴影 */
+  text-shadow: 0 1px 1px rgba(0, 0, 0, .25);
 }
 
-/* 特殊访问权限 badge */
 .special-badge {
   display: inline-flex;
   align-items: center;
@@ -761,9 +536,13 @@ onMounted(() => {
   font-size: 0.78rem;
   background: #fff3bf;
   color: #856404;
+
+  white-space: nowrap;
+  word-break: keep-all;
+  flex-shrink: 0;
+  min-width: 0;
 }
 
-/* 积分 badge */
 .points-badge {
   display: inline-flex;
   align-items: center;
@@ -774,53 +553,70 @@ onMounted(() => {
   color: #d9480f;
 }
 
-/* 空状态 */
-.download-empty {
-  padding: 1.2rem 0.5rem 0.3rem;
-  font-size: 0.9rem;
-  color: #868e96;
+/* ===== 访问权限徽章配色（仅影响徽章本身） ===== */
+/* 0=普通用户：保持上面的灰色默认，不再覆写 */
+
+/* 1=初级用户：铜色 */
+.access-badge.rank-1 {
+  background: linear-gradient(135deg, #CD7F32 0%, #A96E2D 100%);
+  color: #fff;
+  border: 1px solid #8b5a2b;
 }
 
-/* 说明区 */
-.download-note-section {
-  margin-bottom: 0;
+/* 2=中级用户：蓝色 */
+.access-badge.rank-2 {
+  background: linear-gradient(135deg, #4A90E2 0%, #2B6CB0 100%);
+  color: #fff;
 }
 
-.download-notes {
-  margin: 0.5rem 0 0;
-  padding-left: 1.25rem;
-  color: #495057;
-  font-size: 0.9rem;
+/* 3=高级用户：深色金色 */
+.access-badge.rank-3 {
+  background: linear-gradient(135deg, #8D5E0A 0%, #D4AF37 100%);
+  color: #fff;
+  border: 1px solid rgba(141, 94, 10, .6);
 }
 
-.download-notes li + li {
-  margin-top: 0.25rem;
+/* 4=贵宾用户：浅金色（浅底深字，并稍调文字阴影） */
+.access-badge.rank-4 {
+  background: linear-gradient(135deg, #FFF3C4 0%, #FFE9A7 100%);
+  color: #8B4513;
+  border: 1px solid #F0C36D;
+  text-shadow: 0 1px 0 rgba(255,255,255,.6), 0 -1px 0 rgba(0,0,0,.08);
 }
 
-/* 响应式 */
+/* 5=系统管理员：七彩渐变 */
+.access-badge.rank-5 {
+  background: linear-gradient(135deg,
+  #FF0000 0%,
+  #FF7F00 16%,
+  #FFFF00 32%,
+  #00FF00 48%,
+  #0000FF 64%,
+  #4B0082 82%,
+  #8A2BE2 100%
+  );
+  color: #fff;
+  border: 1px solid rgba(0,0,0,.15);
+}
+
+/* 可选：-1=不限 */
+.access-badge.rank-unlimited {
+  background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+  color: #fff;
+}
+
+/* 空状态 & 说明 */
+.download-empty { padding: 1.2rem 0.5rem 0.3rem; font-size: 0.9rem; color: #868e96; }
+.download-note { font-size: .95rem; color: #475569; }
+.download-note ul { margin: .5rem 0 0; padding-left: 1.25rem; }
+.download-note li { margin: .25rem 0; }
+
+/* 响应式（保持可横向滚动） */
 @media (max-width: 768px) {
-  .section.download-section {
-    padding: 1.25rem 1rem;
-    margin-bottom: 1.5rem;
-  }
-
-  .download-section-header {
-    flex-direction: column;
-    align-items: flex-start;
-  }
-
-  .download-table-wrapper {
-    margin: 0 -0.75rem;
-    padding: 0 0.75rem;
-  }
-
-  .download-table th,
-  .download-table td {
-    white-space: nowrap;
-  }
-
-  .download-link {
-    white-space: normal;
-  }
+  .section.download-section { padding: 1.25rem 1rem; margin-bottom: 1.5rem; }
+  .download-section-header { flex-direction: column; align-items: flex-start; }
+  .download-table-wrapper { margin: 0 -0.75rem; padding: 0 0.75rem; overflow-x: auto; -webkit-overflow-scrolling: touch; touch-action: pan-x; }
+  .download-table th, .download-table td { white-space: nowrap; }
+  .download-link { white-space: normal; }
 }
 </style>
