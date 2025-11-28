@@ -44,7 +44,7 @@ export default [
             {
                 name: 'Forum',
                 path: '/forum',
-                component: () => import('@/views/404.vue'),
+                component: () => import('@/views/Forum.vue'),
                 meta: {
                     ...PRESET_LOGIN_BS0,
                     title: 'sidebar.forum',

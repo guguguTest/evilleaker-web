@@ -84,6 +84,17 @@ export default [
                     rule: 'tools'
                 }
             },
+            {
+                name: 'MessageCenter',
+                path: '/message-center',
+                component: () => import('@/views/MessageCenter.vue'),
+                meta: {
+                    // 登录且 BS0 就能看
+                    ...PRESET_LOGIN_BS0,
+                    hidden: true,
+                    rule: 'message-center',
+                },
+            },
             // 补丁工具
             {
                 name: 'Patcher',

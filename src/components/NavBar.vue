@@ -5,6 +5,9 @@ import {useI18nStore} from '@/stores/i18n';
 import {useAuthStore} from '@/stores/auth';
 import {useSidebarStore} from '@/stores/sidebar';
 import {useUserCompute} from '@/composable/user';
+import MessageDropdown from '@/components/MessageDropdown.vue';
+import FriendsDropdown from '@/components/FriendsDropdown.vue';
+
 
 const i18nStore = useI18nStore();
 const authStore = useAuthStore();
@@ -73,8 +76,10 @@ async function handleLogout() {
     <div class="navbar-right">
       <!-- 移动端控件容器 -->
       <div class="mobile-controls">
-        <!-- 移动端消息图标占位符 -->
-        <div id="mobile-message-placeholder"></div>
+        <div id="mobile-message-placeholder" class="top-icons-mobile">
+          <FriendsDropdown mobile />
+          <MessageDropdown mobile />
+        </div>
         <!-- 移动端语言选择器 -->
         <div class="language-selector language-selector-mobile">
           <button class="language-btn" @click="langPopMobile = !langPopMobile">
@@ -91,9 +96,10 @@ async function handleLogout() {
       <!-- PC端用户区域容器 -->
       <div class="user-area-container">
         <!-- PC端消息图标占位符 -->
-        <div id="pc-message-placeholder"></div>
-
-        <!-- 用户区域 -->
+        <div id="pc-message-placeholder" class="top-icons-pc">
+          <FriendsDropdown />
+          <MessageDropdown />
+        </div>
         <div class="user-area" id="user-area-pc">
           <!-- 登录前 -->
           <div class="auth-links" id="auth-links-pc" v-if="!authStore.user">
@@ -126,11 +132,7 @@ async function handleLogout() {
               <span id="user-uid-pc" class="user-uid">{{ authStore.user.email }}</span>
             </div>
             <img id="user-rank-icon-pc" class="user-rank-icon" alt="" :src="userRankInfo.icon">
-            <!--
-            这里得用一个透明DIV垫一下，
-            不能让 user-info 和 user-dropdown 之间出现间隙，
-            否则会触发mouseleave
-            -->
+
             <div v-show="userPop" class="user-dropdown-fix">
               <div class="user-dropdown" :class="{show: userPop}">
                 <div class="dropdown-rank">
@@ -195,4 +197,17 @@ async function handleLogout() {
 #user-info-pc .user-dropdown {
   position: static;
 }
+
+.top-icons-pc {
+  display: flex;
+  align-items: center;
+  margin-right: 12px;
+}
+
+.top-icons-mobile {
+  display: flex;
+  align-items: center;
+  margin-right: 8px;
+}
+
 </style>
