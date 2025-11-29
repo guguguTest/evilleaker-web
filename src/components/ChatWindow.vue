@@ -4,6 +4,7 @@ import {computed, onMounted, onUnmounted, ref} from 'vue';
 import {useChatStore} from '@/stores/chat';
 import {useMessageStore} from '@/stores/messages';
 import EmojiPicker from '@/components/EmojiPicker.vue';
+import DOMPurify from 'dompurify';
 
 const chatStore = useChatStore();
 const messageStore = useMessageStore();
@@ -23,6 +24,14 @@ const dragging = ref(false);
 const resizing = ref(false);
 const dragOffset = ref({x: 0, y: 0});
 const resizeStart = ref({x: 0, y: 0, w: 0, h: 0});
+
+const safeHtml = (html) =>
+    DOMPurify.sanitize(html ?? '', {
+      ALLOWED_TAGS: [
+        'b','i','em','strong','a','br','p','ul','ol','li','img','code','pre','span'
+      ],
+      ALLOWED_ATTR: ['href','target','rel','src','alt','title'],
+    });
 
 function close() {
   chatStore.close();
@@ -143,7 +152,7 @@ onUnmounted(() => {
                 :class="['chat-message', msg.is_sent ? 'sent' : 'received']"
             >
               <div class="chat-message-inner">
-                <div class="chat-message-content" v-html="msg.content"></div>
+                <div class="chat-message-content" v-html="safeHtml(msg.content)"></div>
                 <div class="chat-message-time">
                   {{ formatTime(msg.created_at) }}
                 </div>
@@ -169,8 +178,8 @@ onUnmounted(() => {
           </div>
         </div>
 
-        <div class="chat-resize-handle" @mousedown.prevent="onMouseDownResize">
-          <i class="fas fa-grip-lines"></i>
+        <div class="chat-resize-handle" @mousedown="onMouseDownResize">
+          <i class="fas fa-expand-alt"></i>
         </div>
       </div>
     </div>
@@ -225,6 +234,7 @@ onUnmounted(() => {
   border-radius: 999px;
   object-fit: cover;
   margin-right: 8px;
+  border: 2px solid rgba(255, 255, 255, 0.8);
 }
 
 .chat-title-wrapper {
@@ -233,18 +243,21 @@ onUnmounted(() => {
 }
 
 .chat-title {
-  font-size: 14px;
   font-weight: 600;
+  font-size: 14px;
 }
 
 .chat-subtitle {
   font-size: 12px;
-  opacity: 0.8;
+  opacity: 0.9;
 }
 
 .chat-close-btn {
+  border-radius: 999px;
+  width: 26px;
+  height: 26px;
   border: none;
-  background: transparent;
+  background: rgba(15, 23, 42, 0.15);
   color: #fff;
   cursor: pointer;
 }
@@ -259,15 +272,20 @@ onUnmounted(() => {
 
 .chat-loading,
 .chat-empty {
-  padding: 40px 10px;
+  padding: 40px 20px;
   text-align: center;
   color: #6b7280;
+}
+
+.chat-loading i {
+  font-size: 20px;
+  margin-bottom: 6px;
 }
 
 .chat-messages {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 8px;
 }
 
 .chat-message {
@@ -278,34 +296,45 @@ onUnmounted(() => {
   justify-content: flex-end;
 }
 
+.chat-message.received {
+  justify-content: flex-start;
+}
+
 .chat-message-inner {
   max-width: 80%;
-  padding: 6px 8px;
+  padding: 6px 10px;
   border-radius: 10px;
-  background: #fff;
+  font-size: 14px;
+  position: relative;
 }
 
 .chat-message.sent .chat-message-inner {
   background: #4f46e5;
   color: #fff;
+  border-bottom-right-radius: 2px;
+}
+
+.chat-message.received .chat-message-inner {
+  background: #fff;
+  border-bottom-left-radius: 2px;
+  border: 1px solid #e5e7eb;
 }
 
 .chat-message-content {
-  font-size: 13px;
   word-break: break-word;
 }
 
 .chat-message-time {
   font-size: 11px;
+  opacity: 0.7;
   margin-top: 2px;
   text-align: right;
-  opacity: 0.8;
 }
 
 /* footer */
 .chat-footer {
-  padding: 6px 8px 8px;
   border-top: 1px solid #e5e7eb;
+  padding: 6px 8px;
   background: #f9fafb;
   display: flex;
   flex-direction: column;
@@ -314,17 +343,12 @@ onUnmounted(() => {
 
 .chat-input {
   width: 100%;
-  resize: none;
   border-radius: 8px;
   border: 1px solid #d1d5db;
   padding: 6px 8px;
   font-size: 13px;
+  resize: none;
   outline: none;
-}
-
-.chat-input:focus {
-  border-color: #4f46e5;
-  box-shadow: 0 0 0 1px rgba(79, 70, 229, 0.2);
 }
 
 .chat-toolbar {
@@ -333,7 +357,6 @@ onUnmounted(() => {
 }
 
 .chat-send-btn {
-  border: none;
   border-radius: 999px;
   padding: 4px 12px;
   font-size: 13px;
@@ -357,4 +380,20 @@ onUnmounted(() => {
 }
 
 /* 可以继续把 message.css 中 .chat- 开头样式全部复制到这里，完全 1:1 */
+@media (max-width: 768px) {
+  .chat-modal.pc-draggable {
+    inset: 0;
+  }
+  .chat-container {
+    position: fixed !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 100vw !important;
+    height: 100vh !important;
+    max-width: none;
+    max-height: none;
+    border-radius: 0;
+  }
+}
+
 </style>

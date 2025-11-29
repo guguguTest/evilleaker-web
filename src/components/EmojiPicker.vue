@@ -2,6 +2,8 @@
 <script setup>
 import {onMounted, ref} from 'vue';
 import {getEmojiPacks, getEmojiItems, reportEmojiUsage, getRecentEmojis} from '@/api/emoji';
+import {baseUrl} from '@/api/base';
+import {joinUrl} from '@/utils/misc';
 
 const emit = defineEmits(['select']);
 
@@ -14,6 +16,9 @@ const loading = ref(false);
 async function loadPacks() {
   const res = await getEmojiPacks();
   packs.value = res;
+  if (!packs.value.find(p => p.id === activePackId.value)) {
+    activePackId.value = 'recent';
+  }
 }
 
 async function loadRecent() {
@@ -46,23 +51,19 @@ async function selectEmoji(emoji) {
   });
 
   // 上报使用
-  reportEmojiUsage(emoji.id).catch(() => {});
-
-  // 预加载图片 / 音频（如果有 EmojiCache）
-  if (window.EmojiCache && emoji.file_path) {
-    window.EmojiCache.preloadImageWithCache(emoji.file_path).catch(() => {});
-  }
+  try { await reportEmojiUsage(emoji.id); } catch (_) {}
+  open.value = false;
 }
 
 onMounted(async () => {
   await loadPacks();
-  await loadPackItems('recent');
+  await loadPackItems(activePackId.value);
 });
 </script>
 
 <template>
   <div class="emoji-picker">
-    <button class="emoji-picker-btn" type="button" @click.stop="toggle">
+    <button class="emoji-picker-btn" type="button" @click.stop="toggle" title="表情">
       <i class="far fa-smile"></i>
     </button>
 
@@ -101,10 +102,10 @@ onMounted(async () => {
             <img
                 v-if="emoji.file_path"
                 class="emoji-img"
-                :src="emoji.file_path"
+                :src="joinUrl(baseUrl, emoji.file_path)"
                 :alt="emoji.emoji_name"
             />
-            <span v-else>{{ emoji.emoji_name }}</span>
+            <span v-else>{{ emoji.shortcode || '😀' }}</span>
           </button>
         </template>
       </div>
@@ -130,10 +131,10 @@ onMounted(async () => {
 
 .emoji-dropdown {
   position: absolute;
-  bottom: 120%;
-  left: 0;
+  bottom: 44px;  /* 贴输入框上方 */
+  right: 0;
   width: 260px;
-  max-height: 260px;
+  max-height: 210px;
   background: #fff;
   border-radius: 10px;
   box-shadow: 0 12px 30px rgba(15, 23, 42, 0.28);
@@ -153,30 +154,32 @@ onMounted(async () => {
   white-space: nowrap;
   border-radius: 999px;
   border: none;
-  padding: 2px 8px;
-  font-size: 12px;
   background: #f3f4f6;
+  color: #374151;
+  padding: 4px 8px;
   cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
 }
-
 .emoji-tab.active {
-  background: #4f46e5;
+  background: #10b981;
   color: #fff;
 }
 
 .emoji-list {
-  max-height: 210px;
-  overflow-y: auto;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, 32px);
+  gap: 6px;
+  max-height: 160px;
+  overflow: auto;
 }
 
 .emoji-item {
   width: 32px;
   height: 32px;
-  border-radius: 6px;
+  padding: 0;
   border: none;
+  border-radius: 8px;
   background: #f3f4f6;
   display: flex;
   align-items: center;

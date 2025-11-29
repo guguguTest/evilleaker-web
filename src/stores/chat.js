@@ -16,6 +16,11 @@ export const useChatStore = defineStore('chat', () => {
         const messageStore = useMessageStore();
         visible.value = true;
         messageStore.openConversationWithUser(user);
+        // 打开时居中
+        const vw = window.innerWidth, vh = window.innerHeight;
+        const w = width.value, h = height.value;
+        left.value = Math.max((vw - w) / 2, 0);
+        top.value  = Math.max((vh - h) / 2, 0);
     }
 
     function close() {
@@ -23,22 +28,19 @@ export const useChatStore = defineStore('chat', () => {
     }
 
     function setPosition(x, y) {
-        left.value = x;
-        top.value = y;
+        const vw = window.innerWidth, vh = window.innerHeight;
+        const w = width.value, h = height.value;
+        left.value = Math.min(Math.max(0, x), Math.max(0, vw - w));
+        top.value  = Math.min(Math.max(0, y), Math.max(0, vh - h));
     }
 
     function setSize(w, h) {
-        width.value = Math.max(320, w);
-        height.value = Math.max(360, h);
+        width.value = Math.max(320, Math.min(w, window.innerWidth));
+        height.value = Math.max(360, Math.min(h, window.innerHeight));
     }
 
-    function setDragging(val) {
-        isDragging.value = val;
-    }
-
-    function setResizing(val) {
-        isResizing.value = val;
-    }
+    function setDragging(flag) { isDragging.value = flag; }
+    function setResizing(flag) { isResizing.value = flag; }
 
     return {
         visible,

@@ -9,7 +9,17 @@ import {
   getForumTags,
 } from '@/api/forum';
 import EmojiPicker from '@/components/EmojiPicker.vue';
+import DOMPurify from 'dompurify';
 import {showErrorMessage, showSuccessMessage} from '@/utils/messageBox';
+
+const safeHtml = (html) =>
+    DOMPurify.sanitize(html ?? '', {
+      ALLOWED_TAGS: [
+        'b','i','em','strong','a','br','p','ul','ol','li',
+        'img','blockquote','code','pre','h1','h2','h3','span'
+      ],
+      ALLOWED_ATTR: ['href','target','rel','src','alt','title'],
+    });
 
 const SECTION_CONFIG = [
   { key: 'player', icon: 'fa-users', name: '玩家交流区', desc: '玩家之间的经验交流、闲聊' },
@@ -28,81 +38,101 @@ const currentPost = ref(null);
 const loadingPostDetail = ref(false);
 
 const tags = ref([]);
-const sectionTags = computed(() =>
-    tags.value.filter(t => t.section_key === activeSection.value),
-);
+const sectionTags = computed(() => tags.value.filter(t => t.section === activeSection.value));
 
 const editorVisible = ref(false);
-const editorMode = ref('create'); // create / reply
+const editorMode = ref('create'); // 'create' | 'reply'
 const editorForm = reactive({
   title: '',
   content: '',
   tag_id: null,
 });
 
+const loadingSubmit = ref(false);
+
+function resetEditor() {
+  editorForm.title = '';
+  editorForm.content = '';
+  editorForm.tag_id = null;
+}
+
 async function loadTags() {
-  const res = await getForumTags();
-  tags.value = res;
+  try {
+    const data = await getForumTags();
+    tags.value = data;
+  } catch (e) {
+    console.error(e);
+  }
 }
 
 async function loadPosts(reset = false) {
   if (loadingPosts.value) return;
   if (reset) {
     postPage.value = 1;
-    posts.value = [];
     postsHasMore.value = true;
+    posts.value = [];
   }
-  if (!postsHasMore.value && !reset) return;
+  if (!postsHasMore.value) return;
 
   loadingPosts.value = true;
   try {
-    const res = await getForumPosts(activeSection.value, {
+    const res = await getForumPosts({
+      section: activeSection.value,
       page: postPage.value,
       limit: postLimit.value,
     });
-    if (!Array.isArray(res) || res.length < postLimit.value) {
-      postsHasMore.value = false;
+
+    if (reset) {
+      posts.value = res.items || [];
+    } else {
+      posts.value = posts.value.concat(res.items || []);
     }
-    posts.value = reset ? res : [...posts.value, ...res];
+    postsHasMore.value = res.hasMore;
     postPage.value += 1;
   } catch (e) {
-    showErrorMessage('加载帖子失败');
+    console.error(e);
   } finally {
     loadingPosts.value = false;
   }
 }
 
-async function openSection(sectionKey) {
-  activeSection.value = sectionKey;
-  currentPost.value = null;
-  await loadPosts(true);
-}
-
-async function openPost(post) {
+async function loadPostDetail(id) {
   loadingPostDetail.value = true;
-  currentPost.value = null;
   try {
-    const res = await getForumPostDetail(post.id);
-    currentPost.value = res;
+    const data = await getForumPostDetail(id);
+    currentPost.value = data;
   } catch (e) {
-    showErrorMessage('加载帖子详情失败');
+    console.error(e);
   } finally {
     loadingPostDetail.value = false;
   }
 }
 
+function openSection(key) {
+  if (activeSection.value === key) return;
+  activeSection.value = key;
+  currentPost.value = null;
+  loadPosts(true);
+}
+
+function openPost(post) {
+  loadPostDetail(post.id);
+}
+
+function backToList() {
+  currentPost.value = null;
+}
+
 function openCreatePost() {
   editorMode.value = 'create';
+  resetEditor();
   editorVisible.value = true;
-  editorForm.title = '';
-  editorForm.content = '';
-  editorForm.tag_id = sectionTags.value[0]?.id || null;
 }
 
 function openReply() {
   editorMode.value = 'reply';
+  resetEditor();
   editorVisible.value = true;
-  editorForm.content = '';
 }
 
 function closeEditor() {
@@ -110,41 +140,51 @@ function closeEditor() {
 }
 
 async function submitEditor() {
+  if (!editorForm.content.trim()) {
+    showErrorMessage('内容不能为空');
+    return;
+  }
+
+  loadingSubmit.value = true;
   try {
     if (editorMode.value === 'create') {
-      if (!editorForm.title.trim() || !editorForm.content.trim()) {
-        showErrorMessage('标题和内容不能为空');
+      if (!editorForm.title.trim()) {
+        showErrorMessage('标题不能为空');
+        loadingSubmit.value = false;
         return;
       }
-      await createForumPost(activeSection.value, {
+      await createForumPost({
+        section: activeSection.value,
         title: editorForm.title,
         content: editorForm.content,
         tag_id: editorForm.tag_id,
       });
-      showSuccessMessage('发帖成功');
-      closeEditor();
-      await loadPosts(true);
-    } else if (editorMode.value === 'reply') {
-      if (!currentPost.value) return;
-      if (!editorForm.content.trim()) {
-        showErrorMessage('内容不能为空');
+      showSuccessMessage('发表主题成功');
+      loadPosts(true);
+    } else {
+      if (!currentPost.value) {
+        showErrorMessage('当前帖子不存在');
+        loadingSubmit.value = false;
         return;
       }
       await createForumReply(currentPost.value.id, {
         content: editorForm.content,
       });
       showSuccessMessage('回复成功');
-      closeEditor();
-      await openPost(currentPost.value);
+      await loadPostDetail(currentPost.value.id);
     }
+
+    editorVisible.value = false;
   } catch (e) {
-    showErrorMessage('提交失败');
+    console.error(e);
+    showErrorMessage('操作失败，请稍后重试');
+  } finally {
+    loadingSubmit.value = false;
   }
 }
 
 function onSelectEmoji(emoji) {
-  const text = emoji.text || '';
-  editorForm.content += text;
+  editorForm.content += emoji.text || '';
 }
 
 function formatTime(time) {
@@ -152,18 +192,18 @@ function formatTime(time) {
   return new Date(time).toLocaleString();
 }
 
-onMounted(async () => {
-  await loadTags();
-  await loadPosts(true);
+onMounted(() => {
+  loadTags();
+  loadPosts(true);
 });
 </script>
 
 <template>
-  <div class="section forum-container">
+  <div class="forum-page">
     <div class="forum-header">
       <h1 class="forum-title">
-        <i class="fas fa-comments me-2"></i>
-        交流区
+        <i class="fas fa-comments"></i>
+        论坛交流区
       </h1>
       <p class="forum-subtitle">选择一个分区开始交流</p>
     </div>
@@ -182,7 +222,7 @@ onMounted(async () => {
             <i class="fas" :class="section.icon"></i>
           </div>
           <div class="section-info">
-            <div class="section-title">{{ section.name }}</div>
+            <div class="section-name">{{ section.name }}</div>
             <div class="section-desc">{{ section.desc }}</div>
           </div>
         </div>
@@ -214,101 +254,119 @@ onMounted(async () => {
         <div class="forum-posts">
           <div v-if="loadingPosts" class="forum-loading">
             <i class="fas fa-spinner fa-spin"></i>
-            加载中...
+            <p>加载中...</p>
           </div>
           <div v-else-if="!posts.length" class="forum-empty">
-            <i class="fas fa-inbox"></i>
             暂无帖子
           </div>
-          <div v-else class="forum-post-list">
+          <div v-else>
             <div
                 v-for="post in posts"
                 :key="post.id"
-                class="forum-post-item"
+                class="forum-post-card"
                 @click="openPost(post)"
             >
               <div class="forum-post-title">{{ post.title }}</div>
               <div class="forum-post-meta">
-                <span class="author">{{ post.author_nickname || post.author_username }}</span>
-                <span class="time">{{ formatTime(post.created_at) }}</span>
-                <span class="reply-count">
-                  <i class="fas fa-comment-alt"></i>
-                  {{ post.reply_count }} 回复
+                <span>{{ post.author_nickname || post.author_username }}</span>
+                <span>{{ formatTime(post.created_at) }}</span>
+                <span v-if="post.reply_count">
+                  回复: {{ post.reply_count }}
+                </span>
+              </div>
+              <div class="forum-post-excerpt">
+                {{ post.excerpt }}
+              </div>
+              <div class="forum-post-tags">
+                <span
+                    v-for="tag in post.tags || []"
+                    :key="tag.id"
+                    class="forum-post-tag"
+                >
+                  {{ tag.tag_name }}
                 </span>
               </div>
             </div>
-          </div>
 
-          <div v-if="postsHasMore && !loadingPosts" class="forum-footer">
-            <button class="forum-btn forum-btn-secondary" @click="loadPosts(false)">
-              加载更多
-            </button>
+            <div class="forum-load-more" v-if="postsHasMore">
+              <button
+                  class="forum-btn forum-btn-secondary"
+                  @click="loadPosts()"
+                  :disabled="loadingPosts"
+              >
+                加载更多
+              </button>
+            </div>
           </div>
         </div>
       </div>
     </div>
 
     <!-- 帖子详情 -->
-    <div v-else class="forum-post-detail">
-      <div class="forum-post-detail-header">
-        <button class="forum-btn forum-btn-secondary" @click="currentPost = null">
+    <div v-else class="forum-detail">
+      <div class="forum-detail-header">
+        <button class="forum-btn forum-btn-secondary" @click="backToList">
           <i class="fas fa-arrow-left"></i>
           返回列表
         </button>
       </div>
 
-      <div class="forum-post-card">
-        <h2 class="forum-post-title-detail">{{ currentPost.title }}</h2>
-        <div class="forum-post-meta-detail">
-          <span>{{ currentPost.author_nickname || currentPost.author_username }}</span>
-          <span>{{ formatTime(currentPost.created_at) }}</span>
-        </div>
-        <div class="forum-post-content" v-html="currentPost.content"></div>
-      </div>
-
-      <div class="forum-replies">
-        <h3 class="reply-title">
-          <i class="fas fa-comments"></i>
-          回复
-        </h3>
-        <div v-if="loadingPostDetail" class="forum-loading">
-          <i class="fas fa-spinner fa-spin"></i>
-          加载中...
-        </div>
-        <div v-else-if="!currentPost.replies || !currentPost.replies.length" class="forum-empty">
-          暂无回复
-        </div>
-        <div v-else class="forum-reply-list">
-          <div
-              v-for="reply in currentPost.replies"
-              :key="reply.id"
-              class="forum-reply-item"
-          >
-            <div class="reply-header">
-              <span class="author">{{ reply.nickname || reply.username }}</span>
-              <span class="time">{{ formatTime(reply.created_at) }}</span>
-            </div>
-            <div class="reply-content" v-html="reply.content"></div>
+      <div class="forum-detail-main">
+        <div class="forum-post-detail">
+          <h2 class="forum-post-title-detail">{{ currentPost.title }}</h2>
+          <div class="forum-post-meta-detail">
+            <span>{{ currentPost.author_nickname || currentPost.author_username }}</span>
+            <span>{{ formatTime(currentPost.created_at) }}</span>
           </div>
+          <div class="forum-post-content" v-html="safeHtml(currentPost.content)"></div>
         </div>
-      </div>
 
-      <div class="forum-reply-editor">
-        <h3 class="reply-title">
-          <i class="fas fa-pen"></i>
-          发表回复
-        </h3>
-        <div class="editor-toolbar">
-          <EmojiPicker @select="onSelectEmoji" />
-        </div>
-        <div class="editor-content" contenteditable="true"
-             v-html="editorForm.content"
-             @input="editorForm.content = $event.target.innerHTML"
-        ></div>
-        <div class="editor-actions">
-          <button class="forum-btn forum-btn-primary" @click="openReply">
-            使用弹窗编辑
-          </button>
+        <div class="forum-replies">
+          <h3 class="reply-title">
+            <i class="fas fa-comments"></i>
+            回复
+          </h3>
+          <div v-if="loadingPostDetail" class="forum-loading">
+            <i class="fas fa-spinner fa-spin"></i>
+            加载中...
+          </div>
+          <div v-else-if="!currentPost.replies || !currentPost.replies.length" class="forum-empty">
+            暂无回复
+          </div>
+          <div v-else class="forum-reply-list">
+            <div
+                v-for="reply in currentPost.replies"
+                :key="reply.id"
+                class="forum-reply-item"
+            >
+              <div class="reply-header">
+                <span class="author">{{ reply.nickname || reply.username }}</span>
+                <span class="time">{{ formatTime(reply.created_at) }}</span>
+              </div>
+              <div class="reply-content" v-html="safeHtml(reply.content)"></div>
+            </div>
+          </div>
+
+          <div class="forum-reply-editor">
+            <h3 class="reply-title">
+              <i class="fas fa-pen"></i>
+              发表回复
+            </h3>
+            <div class="editor-toolbar">
+              <EmojiPicker @select="onSelectEmoji" />
+            </div>
+            <div
+                class="editor-content"
+                contenteditable="true"
+                v-html="safeHtml(editorForm.content)"
+                @input="editorForm.content = DOMPurify.sanitize($event.target.innerHTML)"
+            ></div>
+            <div class="editor-actions">
+              <button class="forum-btn forum-btn-primary" @click="openReply">
+                使用弹窗编辑
+              </button>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -351,17 +409,25 @@ onMounted(async () => {
             <div
                 class="editor-content"
                 contenteditable="true"
-                v-html="editorForm.content"
-                @input="editorForm.content = $event.target.innerHTML"
+                v-html="safeHtml(editorForm.content)"
+                @input="editorForm.content = DOMPurify.sanitize($event.target.innerHTML)"
             ></div>
           </div>
         </div>
         <div class="forum-editor-footer">
-          <button class="forum-btn forum-btn-secondary" @click="closeEditor">
+          <button
+              class="forum-btn forum-btn-secondary"
+              @click="closeEditor"
+              :disabled="loadingSubmit"
+          >
             取消
           </button>
-          <button class="forum-btn forum-btn-primary" @click="submitEditor">
-            确定
+          <button
+              class="forum-btn forum-btn-primary"
+              @click="submitEditor"
+              :disabled="loadingSubmit"
+          >
+            {{ loadingSubmit ? '提交中...' : '提交' }}
           </button>
         </div>
       </div>
@@ -370,20 +436,30 @@ onMounted(async () => {
 </template>
 
 <style scoped>
-/* 关键样式来自 forum.css */
+.forum-page {
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: 16px;
+}
 
-/* 顶部 */
 .forum-header {
   margin-bottom: 16px;
 }
 
 .forum-title {
-  font-size: 20px;
-  font-weight: 600;
+  font-size: 22px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.forum-title i {
+  color: #6366f1;
 }
 
 .forum-subtitle {
-  font-size: 14px;
+  margin-top: 4px;
   color: #6b7280;
 }
 
@@ -398,66 +474,61 @@ onMounted(async () => {
 .forum-sections {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 10px;
 }
 
 .section-card {
-  display: flex;
-  align-items: center;
-  padding: 10px 12px;
   border-radius: 12px;
+  padding: 10px 12px;
   background: #f9fafb;
+  display: flex;
+  gap: 10px;
   cursor: pointer;
-  transition: background 0.15s ease, transform 0.1s ease;
+  transition: all 0.2s;
+  border: 1px solid transparent;
 }
 
 .section-card:hover {
   background: #eef2ff;
-  transform: translateY(-1px);
+  border-color: #c7d2fe;
 }
 
 .section-card.active {
-  background: #4f46e5;
-  color: #fff;
+  background: #e0e7ff;
+  border-color: #6366f1;
 }
 
 .section-icon {
-  width: 40px;
-  height: 40px;
-  border-radius: 12px;
-  background: #e5e7eb;
+  width: 32px;
+  height: 32px;
+  border-radius: 999px;
   display: flex;
   align-items: center;
   justify-content: center;
-  margin-right: 10px;
-}
-
-.section-card.active .section-icon {
-  background: rgba(255, 255, 255, 0.1);
+  background: #e5e7eb;
+  color: #4b5563;
 }
 
 .section-info {
   flex: 1;
 }
 
-.section-title {
-  font-size: 14px;
+.section-name {
   font-weight: 600;
+  margin-bottom: 2px;
 }
 
 .section-desc {
-  font-size: 12px;
+  font-size: 13px;
   color: #6b7280;
 }
 
 /* 帖子列表 */
 .forum-content {
-  background: #fff;
   border-radius: 12px;
-  box-shadow: 0 12px 25px rgba(15, 23, 42, 0.08);
+  background: #fff;
+  border: 1px solid #e5e7eb;
   padding: 10px 12px;
-  display: flex;
-  flex-direction: column;
 }
 
 .forum-toolbar {
@@ -467,33 +538,40 @@ onMounted(async () => {
   margin-bottom: 8px;
 }
 
+.forum-tags {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
 .forum-tags-label {
-  font-size: 12px;
+  font-size: 13px;
   color: #6b7280;
-  margin-right: 4px;
 }
 
 .forum-tag {
-  display: inline-block;
-  font-size: 12px;
+  border-radius: 999px;
   background: #eef2ff;
   color: #4f46e5;
   padding: 2px 8px;
-  border-radius: 999px;
-  margin-right: 4px;
+  font-size: 12px;
 }
 
 /* 按钮 */
 .forum-btn {
   border-radius: 999px;
+  padding: 6px 12px;
   border: none;
-  padding: 5px 12px;
-  font-size: 13px;
   cursor: pointer;
+  font-size: 13px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
 }
 
 .forum-btn-primary {
-  background: linear-gradient(135deg, #667eea, #764ba2);
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
   color: #fff;
 }
 
@@ -502,97 +580,129 @@ onMounted(async () => {
   color: #374151;
 }
 
-/* 帖子列表 */
 .forum-posts {
-  flex: 1;
-  margin-top: 6px;
+  margin-top: 4px;
 }
 
-.forum-loading,
-.forum-empty {
-  padding: 30px 0;
+.forum-loading {
+  padding: 40px 20px;
   text-align: center;
   color: #6b7280;
 }
 
-.forum-post-list {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
+.forum-empty {
+  padding: 40px 20px;
+  text-align: center;
+  color: #6b7280;
 }
 
-.forum-post-item {
-  padding: 8px 10px;
+.forum-post-card {
   border-radius: 10px;
-  background: #f9fafb;
+  padding: 8px 10px;
+  border: 1px solid #e5e7eb;
   cursor: pointer;
+  margin-bottom: 8px;
+  background: #fff;
 }
 
-.forum-post-item:hover {
-  background: #eef2ff;
+.forum-post-card:hover {
+  border-color: #a5b4fc;
+  background: #f9fafb;
 }
 
 .forum-post-title {
-  font-size: 14px;
   font-weight: 600;
 }
 
 .forum-post-meta {
-  font-size: 12px;
-  color: #9ca3af;
   display: flex;
-  gap: 8px;
-  margin-top: 2px;
+  flex-wrap: wrap;
+  gap: 6px;
+  font-size: 12px;
+  color: #6b7280;
+  margin-top: 4px;
 }
 
-.forum-footer {
+.forum-post-excerpt {
+  margin-top: 4px;
+  font-size: 13px;
+  color: #4b5563;
+}
+
+.forum-post-tags {
+  margin-top: 6px;
+}
+
+.forum-post-tag {
+  border-radius: 999px;
+  background: #f3e8ff;
+  color: #7c3aed;
+  padding: 2px 8px;
+  font-size: 12px;
+  margin-right: 4px;
+}
+
+.forum-load-more {
   text-align: center;
-  padding: 10px 0 4px;
+  margin-top: 8px;
 }
 
-/* 帖子详情 */
-.forum-post-detail-header {
-  margin-bottom: 10px;
-}
-
-.forum-post-card {
-  background: #fff;
+/* 详情页 */
+.forum-detail {
   border-radius: 12px;
-  box-shadow: 0 12px 25px rgba(15, 23, 42, 0.08);
-  padding: 12px;
-  margin-bottom: 12px;
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  padding: 10px 12px;
+}
+
+.forum-detail-header {
+  margin-bottom: 8px;
+}
+
+.forum-detail-main {
+  display: grid;
+  grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+  gap: 16px;
+}
+
+.forum-post-detail {
+  border-radius: 10px;
+  background: #f9fafb;
+  padding: 10px 12px;
 }
 
 .forum-post-title-detail {
   font-size: 18px;
-  font-weight: 600;
-  margin-bottom: 6px;
+  font-weight: 700;
+  margin-bottom: 4px;
 }
 
 .forum-post-meta-detail {
   font-size: 12px;
-  color: #9ca3af;
+  color: #6b7280;
   margin-bottom: 8px;
 }
 
 .forum-post-content {
   font-size: 14px;
+  color: #111827;
   line-height: 1.6;
 }
 
-/* 回复列表 */
+/* 回复 */
 .forum-replies {
-  background: #fff;
-  border-radius: 12px;
-  box-shadow: 0 12px 25px rgba(15, 23, 42, 0.08);
-  padding: 12px;
-  margin-bottom: 12px;
+  border-radius: 10px;
+  background: #f9fafb;
+  padding: 10px 12px;
 }
 
 .reply-title {
   font-size: 15px;
   font-weight: 600;
   margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 
 .forum-reply-list {
@@ -602,92 +712,104 @@ onMounted(async () => {
 }
 
 .forum-reply-item {
-  padding: 8px 10px;
   border-radius: 10px;
-  background: #f9fafb;
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  padding: 6px 8px;
 }
 
 .reply-header {
-  font-size: 12px;
-  color: #9ca3af;
   display: flex;
   justify-content: space-between;
+  font-size: 12px;
+  color: #6b7280;
   margin-bottom: 4px;
 }
 
 .reply-content {
-  font-size: 14px;
+  font-size: 13px;
+  color: #111827;
 }
 
-/* 简易编辑器 */
+/* 回复编辑 */
 .forum-reply-editor {
-  background: #fff;
-  border-radius: 12px;
-  box-shadow: 0 12px 25px rgba(15, 23, 42, 0.08);
-  padding: 12px;
+  margin-top: 12px;
 }
 
 .editor-toolbar {
-  margin-bottom: 6px;
+  margin-bottom: 4px;
 }
 
 .editor-content {
-  min-height: 120px;
-  border-radius: 10px;
+  min-height: 80px;
+  border-radius: 8px;
   border: 1px solid #d1d5db;
   padding: 6px 8px;
-  font-size: 14px;
-  background: #f9fafb;
+  background: #fff;
+  font-size: 13px;
+  outline: none;
+}
+
+.editor-actions {
+  margin-top: 6px;
+  text-align: right;
 }
 
 /* 弹窗 */
 .forum-editor-modal {
   position: fixed;
   inset: 0;
-  background: rgba(15, 23, 42, 0.55);
+  background: rgba(15, 23, 42, 0.45);
+  z-index: 1400;
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 1600;
 }
 
 .forum-editor-dialog {
-  width: 640px;
-  max-width: calc(100vw - 40px);
-  max-height: calc(100vh - 40px);
+  width: 580px;
+  max-width: 95vw;
+  max-height: 90vh;
   background: #fff;
-  border-radius: 12px;
+  border-radius: 14px;
+  box-shadow: 0 20px 45px rgba(15, 23, 42, 0.4);
   display: flex;
   flex-direction: column;
 }
 
-.forum-editor-header,
-.forum-editor-footer {
-  padding: 8px 10px;
+.forum-editor-header {
+  padding: 8px 12px;
   border-bottom: 1px solid #e5e7eb;
   display: flex;
-  align-items: center;
   justify-content: space-between;
-}
-
-.forum-editor-footer {
-  border-top: 1px solid #e5e7eb;
-  border-bottom: none;
+  align-items: center;
 }
 
 .forum-editor-body {
-  padding: 10px;
+  padding: 8px 12px;
   overflow-y: auto;
 }
 
+.forum-editor-footer {
+  padding: 8px 12px;
+  border-top: 1px solid #e5e7eb;
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
 .forum-editor-close {
+  border-radius: 999px;
+  width: 26px;
+  height: 26px;
   border: none;
-  background: transparent;
+  background: #e5e7eb;
   cursor: pointer;
 }
 
+/* 表单 */
 .editor-field {
-  margin-bottom: 10px;
+  margin-bottom: 8px;
 }
 
 .editor-field label {
