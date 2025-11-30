@@ -23,10 +23,11 @@ export function searchUsers(keyword) {
     });
 }
 
-// 发起好友请求
-export function sendFriendRequest(targetUserId) {
+// 发送好友请求（注意：这里要跟后端保持兼容，使用 receiver_id 字段）
+export function sendFriendRequest(userId) {
     return request.post('/api/friends/request', {
-        target_user_id: targetUserId,
+        receiver_id: parseInt(userId, 10), // 与原版保持一致
+        message: '',                       // 可选消息，先留空
     });
 }
 
@@ -63,7 +64,7 @@ export function getFriendPrivacy() {
 }
 
 // 更新好友隐私设置
+// data: { searchable_by, message_privacy }
 export function updateFriendPrivacy(data) {
-    // data: { searchable_by, message_privacy }
     return request.put('/api/friends/privacy', data);
 }

@@ -76,7 +76,7 @@ export default [
             {
                 name: 'Tools',
                 path: '/tools',
-                component: () => import('@/views/404.vue'),
+                component: () => import('@/views/Tools.vue'),
                 meta: {
                     ...PRESET_LOGIN_BS1,
                     title: 'sidebar.tools',
