@@ -1,6 +1,6 @@
 // src/stores/messages.js
-import { defineStore } from 'pinia';
-import { ref } from 'vue';
+import { defineStore } from 'pinia'
+import { ref } from 'vue'
 import {
     getUnreadCount,
     getRecentMessages,
@@ -11,211 +11,174 @@ import {
     batchDeleteMessages,
     getConversation,
     sendMessage,
-} from '@/api/message';
-import { useAuthStore } from '@/stores/auth';
+} from '@/api/message'
+import { useAuthStore } from '@/stores/auth'
 
-function toArray(v) {
-    if (!v) return [];
-    return Array.isArray(v) ? v : [v];
+// 判定是否表情消息（严格不用 v-html）
+function isEmojiPayload (text) {
+    return typeof text === 'string' && text.startsWith('[emoji:') && text.endsWith(']')
 }
 
 export const useMessageStore = defineStore('messages', () => {
-    // ====== 会话相关（聊天窗口） ======
-    const conversationUser = ref(null);      // 当前聊天对象（好友）
-    const conversation = ref([]);            // 当前会话消息列表
-    const loadingConversation = ref(false);
+    // 顶栏/下拉
+    const unread = ref(0)
+    const recent = ref([])
 
-    // ====== 顶部图标 & 下拉 ======
-    const unreadCount = ref(0);
-    const recentMessages = ref([]);
+    // 消息中心
+    const listLoading = ref(false)
+    const list = ref([])
 
-    // ====== 消息中心列表 ======
-    const list = ref([]);
-    const listPage = ref(1);
-    const listPageSize = ref(20);
-    const listHasMore = ref(true);
-    const listLoading = ref(false);
+    // 聊天会话
+    const conversationUser = ref(null) // { id, username, nickname, avatar, uid }
+    const loadingConversation = ref(false)
+    const conversation = ref([])       // [{ id, sender_id, content, created_at, message_type, is_sent, is_read }]
 
-    // -------- 未读 & 最近 --------
-    async function refreshUnreadCount() {
+    // ---------- 顶栏/下拉 ----------
+    async function refreshUnread () {
         try {
-            const res = await getUnreadCount();
-            unreadCount.value = Number(res.data?.count || 0);
+            const res = await getUnreadCount()
+            unread.value = Number(res?.count ?? 0)
         } catch (e) {
-            console.error('refreshUnreadCount error', e);
+            console.error('getUnreadCount error', e)
         }
     }
 
-    async function refreshRecentMessages() {
+    async function refreshRecentMessages () {
         try {
-            const res = await getRecentMessages();
-            recentMessages.value = toArray(res.data);
+            const res = await getRecentMessages()
+            recent.value = Array.isArray(res) ? res : []
         } catch (e) {
-            console.error('refreshRecentMessages error', e);
+            console.error('getRecentMessages error', e)
+            recent.value = []
         }
     }
 
-    // -------- 消息中心列表 --------
-    async function loadMessageList(reset = false) {
-        if (listLoading.value) return;
-        listLoading.value = true;
+    // ---------- 消息中心 ----------
+    async function loadMessageList () {
+        listLoading.value = true
         try {
-            const page = reset ? 1 : listPage.value;
-            const res = await getMessageList({
-                page,
-                limit: listPageSize.value,
-            });
-            const items = Array.isArray(res.data) ? res.data : [];
-            if (reset) {
-                list.value = items;
-            } else {
-                list.value = list.value.concat(items);
-            }
-            listPage.value = page + 1;
-            listHasMore.value = items.length >= listPageSize.value;
+            const res = await getMessageList()
+            list.value = Array.isArray(res) ? res : []
         } catch (e) {
-            console.error('loadMessageList error', e);
+            console.error('getMessageList error', e)
+            list.value = []
         } finally {
-            listLoading.value = false;
+            listLoading.value = false
         }
     }
 
-    async function markAsRead(id) {
+    async function markAsRead (id) {
         try {
-            await markMessageRead(id);
-            list.value = list.value.map((m) =>
-                m.id === id ? { ...m, is_read: 1 } : m,
-            );
-            if (unreadCount.value > 0) unreadCount.value -= 1;
+            await markMessageRead(id)
+            // 前端同步已读
+            const item = list.value.find(m => m.id === id)
+            if (item) item.is_read = true
+            // 顶栏角标刷新
+            refreshUnread().catch(() => {})
         } catch (e) {
-            console.error('markAsRead error', e);
+            console.error('markMessageRead error', e)
         }
     }
 
-    async function markAllAsRead() {
+    async function markAllAsRead () {
         try {
-            await markAllMessagesRead();
-            list.value = list.value.map((m) => ({ ...m, is_read: 1 }));
-            unreadCount.value = 0;
+            await markAllMessagesRead()
+            list.value.forEach(m => { m.is_read = true })
+            refreshUnread().catch(() => {})
         } catch (e) {
-            console.error('markAllAsRead error', e);
+            console.error('markAllMessagesRead error', e)
         }
     }
 
-    async function batchDelete(ids) {
-        const idArr = toArray(ids).map((x) => Number(x));
-        if (!idArr.length) return;
+    async function deleteOne (id) {
         try {
-            await batchDeleteMessages(idArr);
-            list.value = list.value.filter((m) => !idArr.includes(m.id));
+            await deleteMessage(id)
+            const idx = list.value.findIndex(m => m.id === id)
+            if (idx >= 0) list.value.splice(idx, 1)
         } catch (e) {
-            console.error('batchDelete error', e);
+            console.error('deleteMessage error', e)
         }
     }
 
-    async function deleteOne(id) {
+    async function batchDeleteSelected (ids = []) {
+        if (!ids.length) return
         try {
-            await deleteMessage(id);
-            list.value = list.value.filter((m) => m.id !== id);
+            await batchDeleteMessages(ids)
+            const set = new Set(ids)
+            list.value = list.value.filter(m => !set.has(m.id))
         } catch (e) {
-            console.error('deleteOne error', e);
+            console.error('batchDeleteMessages error', e)
         }
     }
 
-    // -------- 会话（聊天窗口） --------
-    async function openConversationWithUser(user) {
-        if (!user || !user.id) return;
-        conversationUser.value = user;
-        loadingConversation.value = true;
-        conversation.value = [];
+    // ---------- 聊天会话 ----------
+    async function openConversationWithUser (user) {
+        if (!user || !user.id) return
+        conversationUser.value = user
+        loadingConversation.value = true
         try {
-            const res = await getConversation(user.id);
-            const data = res.data || {};
-            const msgs = Array.isArray(data.messages) ? data.messages : [];
-            conversation.value = msgs;
+            const res = await getConversation(user.id)
+            // 后端返回可能是 { messages, otherUserOnline, otherUserId }
+            const data = res?.messages ? res : (res?.data ?? {})
+            const msgs = Array.isArray(data.messages) ? data.messages : (Array.isArray(res) ? res : [])
+            conversation.value = Array.isArray(msgs) ? msgs : []
         } catch (e) {
-            console.error('openConversationWithUser error', e);
-            conversation.value = [];
+            console.error('openConversationWithUser error', e)
+            conversation.value = []
         } finally {
-            loadingConversation.value = false;
+            loadingConversation.value = false
         }
     }
 
     /**
-     * 发送聊天消息
-     * @param {string} rawContent 文本 / emoji 特殊串
-     * @returns {Promise<void>}
+     * 发送聊天消息（文本或表情串）
+     * - rawContent: string（安全文本 / “[emoji:{...}]”）
+     * - 后端会校验 message_type，未识别类型会回退到 'user'（我们这里也按该约定）
      */
-    async function sendChatMessage(rawContent) {
-        const user = conversationUser.value;
-        if (!user || !user.id) {
-            console.warn('sendChatMessage: no conversation user');
-            return;
-        }
-        const content = String(rawContent ?? '').trim();
-        if (!content) return;
+    async function sendChatMessage (rawContent) {
+        const user = conversationUser.value
+        if (!user || !user.id) return
+        const content = String(rawContent ?? '').trim()
+        if (!content) return
 
-        const authStore = useAuthStore();
-        const me = authStore.user || {};
-        const senderId = me.id;
+        const auth = useAuthStore()
+        const meId = auth?.user?.id
 
-        const tempId = Date.now();
-        const nowIso = new Date().toISOString();
-
-        // 本地先插一条，提升体验
+        // 本地临时追加（“发送中”）
+        const tempId = `tmp_${Date.now()}_${Math.random().toString(36).slice(2)}`
         const tempMsg = {
             id: tempId,
-            sender_id: senderId,
+            sender_id: meId,
             content,
-            created_at: nowIso,
-            message_type: 'user',
+            message_type: isEmojiPayload(content) ? 'emoji' : 'user',
+            created_at: new Date().toISOString(),
             is_sent: true,
             is_read: false,
-        };
-        conversation.value = [...conversation.value, tempMsg];
+        }
+        conversation.value.push(tempMsg)
 
         try {
-            const res = await sendMessage({
+            await sendMessage({
                 recipient_id: user.id,
                 content,
-            });
-            const realId = res.data?.message_id;
-            if (realId) {
-                tempMsg.id = realId;
-            }
+                message_type: isEmojiPayload(content) ? 'emoji' : 'user',
+            })
+            // 成功：保持 UI 一致（后续轮询/重新打开会话时会用真实 ID 覆盖）
         } catch (e) {
-            console.error('sendChatMessage error', e);
-            tempMsg.send_error = true; // 方便前端加个红色提示
-            throw e;
+            console.error('sendMessage error', e)
+            // 失败：给一个失败提示状态
+            tempMsg._sendFailed = true
         }
     }
 
     return {
         // state
-        conversationUser,
-        conversation,
-        loadingConversation,
-        unreadCount,
-        recentMessages,
-        list,
-        listPage,
-        listPageSize,
-        listHasMore,
-        listLoading,
-
-        // 顶部图标 & 下拉
-        refreshUnreadCount,
-        refreshRecentMessages,
-
-        // 消息中心
-        loadMessageList,
-        markAsRead,
-        markAllAsRead,
-        batchDelete,
-        deleteOne,
-
-        // 聊天窗口
-        openConversationWithUser,
-        sendChatMessage,
-    };
-});
+        unread, recent,
+        listLoading, list,
+        conversationUser, loadingConversation, conversation,
+        // actions
+        refreshUnread, refreshRecentMessages,
+        loadMessageList, markAsRead, markAllAsRead, deleteOne, batchDeleteSelected,
+        openConversationWithUser, sendChatMessage,
+    }
+})
