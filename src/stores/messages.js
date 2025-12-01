@@ -1,121 +1,193 @@
 // src/stores/messages.js
-import { defineStore } from 'pinia'
-import { ref } from 'vue'
-import axios from 'axios'
+import { defineStore } from 'pinia';
+import { ref } from 'vue';
+import {
+    getUnreadCount,
+    getRecentMessages,
+    getMessageList,
+    markMessageRead,
+    markAllMessagesRead,
+    deleteMessage,
+    batchDeleteMessages,
+    getConversation,
+    sendMessage,
+} from '@/api/message';
+import { useAuthStore } from '@/stores/auth';
+
+function toArray(v) {
+    if (!v) return [];
+    return Array.isArray(v) ? v : [v];
+}
 
 export const useMessageStore = defineStore('messages', () => {
-    // 会话相关
-    const conversationUser = ref(null)
-    const conversation = ref([])                // ⚠️ 必须初始化为空数组
-    const loadingConversation = ref(false)
+    // ====== 会话相关（聊天窗口） ======
+    const conversationUser = ref(null);      // 当前聊天对象（好友）
+    const conversation = ref([]);            // 当前会话消息列表
+    const loadingConversation = ref(false);
 
-    // 下拉/未读
-    const unreadCount = ref(0)
-    const recentMessages = ref([])
+    // ====== 顶部图标 & 下拉 ======
+    const unreadCount = ref(0);
+    const recentMessages = ref([]);
 
-    // —— 工具：保证数组 —— //
-    function ensureArray() {
-        if (!Array.isArray(conversation.value)) conversation.value = []
-    }
+    // ====== 消息中心列表 ======
+    const list = ref([]);
+    const listPage = ref(1);
+    const listPageSize = ref(20);
+    const listHasMore = ref(true);
+    const listLoading = ref(false);
 
-    // —— 刷新未读与最近消息（根据你现有后端接口名改一下即可）—— //
+    // -------- 未读 & 最近 --------
     async function refreshUnreadCount() {
         try {
-            const { data } = await axios.get('/api/messages/unread-count')
-            unreadCount.value = Number(data?.count || 0)
-        } catch (_) {
-            unreadCount.value = 0
+            const res = await getUnreadCount();
+            unreadCount.value = Number(res.data?.count || 0);
+        } catch (e) {
+            console.error('refreshUnreadCount error', e);
         }
     }
 
     async function refreshRecentMessages() {
         try {
-            const { data } = await axios.get('/api/messages/recent')
-            recentMessages.value = Array.isArray(data) ? data : (data?.items || [])
-        } catch (_) {
-            recentMessages.value = []
+            const res = await getRecentMessages();
+            recentMessages.value = toArray(res.data);
+        } catch (e) {
+            console.error('refreshRecentMessages error', e);
         }
     }
 
-    // —— 打开会话并拉历史 —— //
-    async function openConversationWithUser(user) {
-        conversationUser.value = user
-        loadingConversation.value = true
-        conversation.value = [] // 重置为数组，避免 not iterable
-
+    // -------- 消息中心列表 --------
+    async function loadMessageList(reset = false) {
+        if (listLoading.value) return;
+        listLoading.value = true;
         try {
-            // 你原来的历史接口是什么就用什么；下面是示例
-            // 返回数组：[{ id, content, is_sent, created_at }, ...]
-            const { data } = await axios.get('/api/messages/history', {
-                params: { userId: user.id },
-            })
-            conversation.value = Array.isArray(data) ? data : (data?.items || [])
+            const page = reset ? 1 : listPage.value;
+            const res = await getMessageList({
+                page,
+                limit: listPageSize.value,
+            });
+            const items = Array.isArray(res.data) ? res.data : [];
+            if (reset) {
+                list.value = items;
+            } else {
+                list.value = list.value.concat(items);
+            }
+            listPage.value = page + 1;
+            listHasMore.value = items.length >= listPageSize.value;
         } catch (e) {
-            conversation.value = []
+            console.error('loadMessageList error', e);
         } finally {
-            loadingConversation.value = false
+            listLoading.value = false;
         }
     }
 
-    // —— 发送消息 —— //
-    function appendConversationMessage(localMsg) {
-        ensureArray()
-        conversation.value = [...conversation.value, localMsg]
-    }
-
-    async function sendChatMessage(text) {
-        if (!conversationUser.value) return
-        const payload = {
-            toUserId: conversationUser.value.id,
-            content: text,
-        }
-
-        // 先本地插一条，提升手感（失败再回滚）
-        const tempId = 'temp_' + Date.now()
-        const localMsg = {
-            id: tempId,
-            is_sent: true,
-            content: text,
-            created_at: new Date().toISOString(),
-        }
-        appendConversationMessage(localMsg)
-
+    async function markAsRead(id) {
         try {
-            const { data } = await axios.post('/api/messages/send', payload)
-            const serverMsg = data?.message || {
-                id: data?.id,
-                is_sent: true,
-                content: text,
-                created_at: data?.created_at || new Date().toISOString(),
-            }
-
-            // 用后端返回的 id/时间替换本地临时消息
-            ensureArray()
-            const idx = conversation.value.findIndex((m) => m.id === tempId)
-            if (idx !== -1) {
-                conversation.value.splice(idx, 1, serverMsg)
-            }
-            // 未读/最近消息可以顺便刷新
-            refreshUnreadCount().catch(() => {})
-            refreshRecentMessages().catch(() => {})
+            await markMessageRead(id);
+            list.value = list.value.map((m) =>
+                m.id === id ? { ...m, is_read: 1 } : m,
+            );
+            if (unreadCount.value > 0) unreadCount.value -= 1;
         } catch (e) {
-            // 发送失败：回滚本地临时消息
-            ensureArray()
-            const idx = conversation.value.findIndex((m) => m.id === tempId)
-            if (idx !== -1) conversation.value.splice(idx, 1)
-            throw e
+            console.error('markAsRead error', e);
         }
     }
 
-    // —— 标记已读（供下拉用）—— //
-    async function markAsRead(messageId) {
+    async function markAllAsRead() {
         try {
-            await axios.post('/api/messages/mark-read', { id: messageId })
-            // 本地同步
-            const msg = (recentMessages.value || []).find((m) => m.id === messageId)
-            if (msg) msg.is_read = true
-            refreshUnreadCount().catch(() => {})
-        } catch (_) {}
+            await markAllMessagesRead();
+            list.value = list.value.map((m) => ({ ...m, is_read: 1 }));
+            unreadCount.value = 0;
+        } catch (e) {
+            console.error('markAllAsRead error', e);
+        }
+    }
+
+    async function batchDelete(ids) {
+        const idArr = toArray(ids).map((x) => Number(x));
+        if (!idArr.length) return;
+        try {
+            await batchDeleteMessages(idArr);
+            list.value = list.value.filter((m) => !idArr.includes(m.id));
+        } catch (e) {
+            console.error('batchDelete error', e);
+        }
+    }
+
+    async function deleteOne(id) {
+        try {
+            await deleteMessage(id);
+            list.value = list.value.filter((m) => m.id !== id);
+        } catch (e) {
+            console.error('deleteOne error', e);
+        }
+    }
+
+    // -------- 会话（聊天窗口） --------
+    async function openConversationWithUser(user) {
+        if (!user || !user.id) return;
+        conversationUser.value = user;
+        loadingConversation.value = true;
+        conversation.value = [];
+        try {
+            const res = await getConversation(user.id);
+            const data = res.data || {};
+            const msgs = Array.isArray(data.messages) ? data.messages : [];
+            conversation.value = msgs;
+        } catch (e) {
+            console.error('openConversationWithUser error', e);
+            conversation.value = [];
+        } finally {
+            loadingConversation.value = false;
+        }
+    }
+
+    /**
+     * 发送聊天消息
+     * @param {string} rawContent 文本 / emoji 特殊串
+     * @returns {Promise<void>}
+     */
+    async function sendChatMessage(rawContent) {
+        const user = conversationUser.value;
+        if (!user || !user.id) {
+            console.warn('sendChatMessage: no conversation user');
+            return;
+        }
+        const content = String(rawContent ?? '').trim();
+        if (!content) return;
+
+        const authStore = useAuthStore();
+        const me = authStore.user || {};
+        const senderId = me.id;
+
+        const tempId = Date.now();
+        const nowIso = new Date().toISOString();
+
+        // 本地先插一条，提升体验
+        const tempMsg = {
+            id: tempId,
+            sender_id: senderId,
+            content,
+            created_at: nowIso,
+            message_type: 'user',
+            is_sent: true,
+            is_read: false,
+        };
+        conversation.value = [...conversation.value, tempMsg];
+
+        try {
+            const res = await sendMessage({
+                recipient_id: user.id,
+                content,
+            });
+            const realId = res.data?.message_id;
+            if (realId) {
+                tempMsg.id = realId;
+            }
+        } catch (e) {
+            console.error('sendChatMessage error', e);
+            tempMsg.send_error = true; // 方便前端加个红色提示
+            throw e;
+        }
     }
 
     return {
@@ -125,12 +197,25 @@ export const useMessageStore = defineStore('messages', () => {
         loadingConversation,
         unreadCount,
         recentMessages,
+        list,
+        listPage,
+        listPageSize,
+        listHasMore,
+        listLoading,
 
-        // actions
+        // 顶部图标 & 下拉
         refreshUnreadCount,
         refreshRecentMessages,
+
+        // 消息中心
+        loadMessageList,
+        markAsRead,
+        markAllAsRead,
+        batchDelete,
+        deleteOne,
+
+        // 聊天窗口
         openConversationWithUser,
         sendChatMessage,
-        markAsRead,
-    }
-})
+    };
+});

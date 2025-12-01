@@ -1,6 +1,8 @@
 // src/api/message.js
 import request from './index';
 
+// ========= 未读 & 最近 =========
+
 // 未读消息数量
 export function getUnreadCount() {
     return request.get('/api/messages/unread-count');
@@ -11,22 +13,29 @@ export function getRecentMessages() {
     return request.get('/api/messages/recent');
 }
 
-// 消息中心列表 page / limit
+// ========= 消息中心列表 =========
+
+// 消息中心列表（page / limit）
 export function getMessageList(params) {
     return request.get('/api/messages', { params });
 }
 
-// 消息详情（如果你要单独弹窗看详情）
+// 单条详情
 export function getMessageDetail(id) {
     return request.get(`/api/messages/${id}`);
 }
 
-// 标记单条消息为已读
+// 标记单条为已读
 export function markMessageRead(id) {
     return request.put(`/api/messages/${id}/read`);
 }
 
-// 删除单条消息
+// 标记全部为已读
+export function markAllMessagesRead() {
+    return request.put('/api/messages/mark-all-read');
+}
+
+// 删除一条
 export function deleteMessage(id) {
     return request.delete(`/api/messages/${id}`);
 }
@@ -38,7 +47,9 @@ export function batchDeleteMessages(ids) {
     });
 }
 
-// 会话（聊天窗口）
+// ========= 聊天会话 =========
+
+// 会话（好友聊天窗口）
 export function getConversation(userId) {
     return request.get(`/api/messages/conversation/${userId}`);
 }

@@ -1,196 +1,238 @@
 <!-- src/components/EmojiPicker.vue -->
 <script setup>
-import {onMounted, ref} from 'vue';
-import {getEmojiPacks, getEmojiItems, reportEmojiUsage, getRecentEmojis} from '@/api/emoji';
-import {baseUrl} from '@/api/base';
-import {joinUrl} from '@/utils/misc';
+import { onMounted, ref } from 'vue';
+import {
+  getEmojiPacks,
+  getEmojiItems,
+  reportEmojiUsage,
+  getRecentEmojis,
+} from '@/api/emoji';
+import { baseUrl } from '@/api/base';
+import { joinUrl } from '@/utils/misc';
 
 const emit = defineEmits(['select']);
 
-const open = ref(false);
 const packs = ref([]);
-const activePackId = ref('recent'); // 'recent' or pack.id
+const activePackId = ref('recent'); // 'recent' 或具体 pack.id
 const emojis = ref([]);
 const loading = ref(false);
 
+function buildImgUrl(path) {
+  if (!path) return '';
+  return joinUrl(baseUrl, path);
+}
+
 async function loadPacks() {
-  const res = await getEmojiPacks();
-  packs.value = res;
-  if (!packs.value.find(p => p.id === activePackId.value)) {
-    activePackId.value = 'recent';
+  try {
+    const res = await getEmojiPacks();
+    packs.value = Array.isArray(res.data) ? res.data : [];
+  } catch (e) {
+    console.error('load emoji packs error', e);
   }
 }
 
 async function loadRecent() {
-  const res = await getRecentEmojis();
-  emojis.value = res;
-}
-
-async function loadPackItems(packId) {
   loading.value = true;
   try {
-    if (packId === 'recent') {
-      await loadRecent();
-    } else {
-      const res = await getEmojiItems(packId);
-      emojis.value = res;
-    }
+    const res = await getRecentEmojis();
+    emojis.value = Array.isArray(res.data) ? res.data : [];
+  } catch (e) {
+    console.error('load recent emojis error', e);
+    emojis.value = [];
   } finally {
     loading.value = false;
   }
 }
 
-function toggle() {
-  open.value = !open.value;
+async function loadPackItems(packId) {
+  loading.value = true;
+  try {
+    const res = await getEmojiItems(packId);
+    emojis.value = Array.isArray(res.data) ? res.data : [];
+  } catch (e) {
+    console.error('load emoji items error', e);
+    emojis.value = [];
+  } finally {
+    loading.value = false;
+  }
 }
 
-async function selectEmoji(emoji) {
-  emit('select', {
-    id: emoji.id,
-    text: emoji.shortcode || emoji.emoji_name || '',
-  });
+async function switchPack(id) {
+  if (activePackId.value === id) return;
+  activePackId.value = id;
+  if (id === 'recent') {
+    await loadRecent();
+  } else {
+    await loadPackItems(id);
+  }
+}
 
-  // 上报使用
-  try { await reportEmojiUsage(emoji.id); } catch (_) {}
-  open.value = false;
+async function handleSelect(emoji) {
+  // 先上报使用
+  try {
+    if (emoji?.id) {
+      await reportEmojiUsage(emoji.id);
+    }
+  } catch (e) {
+    console.error('reportEmojiUsage error', e);
+  }
+  // 把完整 emoji 对象抛给父组件，由父组件决定如何编码成 [emoji:xxx]
+  emit('select', emoji);
 }
 
 onMounted(async () => {
   await loadPacks();
-  await loadPackItems(activePackId.value);
+  await loadRecent();
 });
 </script>
 
 <template>
   <div class="emoji-picker">
-    <button class="emoji-picker-btn" type="button" @click.stop="toggle" title="表情">
-      <i class="far fa-smile"></i>
-    </button>
+    <div class="emoji-tabs">
+      <button
+          class="emoji-tab"
+          :class="{ active: activePackId === 'recent' }"
+          type="button"
+          @click="switchPack('recent')"
+          title="最近使用"
+      >
+        <i class="far fa-clock" />
+      </button>
+      <button
+          v-for="pack in packs"
+          :key="pack.id"
+          class="emoji-tab"
+          :class="{ active: activePackId === pack.id }"
+          type="button"
+          @click="switchPack(pack.id)"
+          :title="pack.pack_name"
+      >
+        <img
+            v-if="pack.cover_image"
+            class="emoji-pack-cover"
+            :src="buildImgUrl(pack.cover_image)"
+            :alt="pack.pack_name"
+        />
+        <span v-else class="emoji-pack-text">
+          {{ pack.pack_name?.slice(0, 2) || '包' }}
+        </span>
+      </button>
+    </div>
 
-    <div v-if="open" class="emoji-dropdown" @click.stop>
-      <div class="emoji-tabs">
-        <button
-            class="emoji-tab"
-            :class="{ active: activePackId === 'recent' }"
-            @click="activePackId = 'recent'; loadPackItems('recent')"
-        >
-          最近
-        </button>
-        <button
-            v-for="pack in packs"
-            :key="pack.id"
-            class="emoji-tab"
-            :class="{ active: activePackId === pack.id }"
-            @click="activePackId = pack.id; loadPackItems(pack.id)"
-        >
-          {{ pack.pack_name }}
-        </button>
+    <div class="emoji-grid-container">
+      <div v-if="loading" class="emoji-loading">
+        <i class="fas fa-spinner fa-spin" />
+        <span>加载表情中...</span>
       </div>
-
-      <div class="emoji-list">
-        <div v-if="loading" class="emoji-loading">
-          <i class="fas fa-spinner fa-spin"></i>
-        </div>
-        <template v-else>
-          <button
-              v-for="emoji in emojis"
-              :key="emoji.id"
-              class="emoji-item"
-              type="button"
-              @click="selectEmoji(emoji)"
-          >
-            <img
-                v-if="emoji.file_path"
-                class="emoji-img"
-                :src="joinUrl(baseUrl, emoji.file_path)"
-                :alt="emoji.emoji_name"
-            />
-            <span v-else>{{ emoji.shortcode || '😀' }}</span>
-          </button>
-        </template>
+      <div v-else-if="!emojis.length" class="emoji-empty">
+        暂无表情
+      </div>
+      <div v-else class="emoji-grid">
+        <button
+            v-for="emoji in emojis"
+            :key="emoji.id"
+            type="button"
+            class="emoji-item"
+            @click="handleSelect(emoji)"
+        >
+          <img
+              class="emoji-img"
+              :src="buildImgUrl(emoji.file_path)"
+              :alt="emoji.emoji_name || emoji.file_name"
+          />
+        </button>
       </div>
     </div>
   </div>
 </template>
 
 <style scoped>
-/* 关键样式来自 emoji.css */
-
 .emoji-picker {
-  position: relative;
-  display: inline-block;
-}
-
-.emoji-picker-btn {
-  border: none;
-  background: transparent;
-  cursor: pointer;
-  color: #6b7280;
-  font-size: 18px;
-}
-
-.emoji-dropdown {
-  position: absolute;
-  bottom: 44px;  /* 贴输入框上方 */
-  right: 0;
-  width: 260px;
-  max-height: 210px;
-  background: #fff;
-  border-radius: 10px;
-  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.28);
-  padding: 6px;
-  z-index: 1500;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-height: 320px;
 }
 
 .emoji-tabs {
   display: flex;
-  flex-wrap: nowrap;
-  overflow-x: auto;
-  margin-bottom: 6px;
+  padding: 4px;
+  border-bottom: 1px solid #ebeef5;
   gap: 4px;
+  overflow-x: auto;
 }
 
 .emoji-tab {
-  white-space: nowrap;
-  border-radius: 999px;
   border: none;
-  background: #f3f4f6;
-  color: #374151;
-  padding: 4px 8px;
+  outline: none;
+  background: transparent;
+  border-radius: 6px;
+  padding: 4px 6px;
   cursor: pointer;
-  font-size: 12px;
-  font-weight: 600;
-}
-.emoji-tab.active {
-  background: #10b981;
-  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
-.emoji-list {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, 32px);
-  gap: 6px;
-  max-height: 160px;
+.emoji-tab.active {
+  background: #ecf5ff;
+  color: #409eff;
+}
+
+.emoji-pack-cover {
+  width: 24px;
+  height: 24px;
+  border-radius: 4px;
+  object-fit: cover;
+}
+
+.emoji-pack-text {
+  font-size: 12px;
+  color: #606266;
+}
+
+.emoji-grid-container {
+  flex: 1;
   overflow: auto;
+  padding: 6px;
+}
+
+.emoji-loading,
+.emoji-empty {
+  height: 180px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: #909399;
+  font-size: 13px;
+  gap: 6px;
+}
+
+.emoji-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(36px, 1fr));
+  gap: 4px;
 }
 
 .emoji-item {
-  width: 32px;
-  height: 32px;
-  padding: 0;
   border: none;
-  border-radius: 8px;
-  background: #f3f4f6;
+  outline: none;
+  padding: 4px;
+  background: transparent;
+  border-radius: 6px;
+  cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  cursor: pointer;
+}
+
+.emoji-item:hover {
+  background: #f5f7fa;
 }
 
 .emoji-img {
   max-width: 100%;
   max-height: 100%;
 }
-
-/* 其余细节可以从 origin_project/css/emoji.css 复制 */
 </style>
