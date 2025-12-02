@@ -46,6 +46,7 @@ const isMobile = ref(false)
 const emojiVisible = ref(false)
 const inputText = ref('')
 const sending = ref(false)
+
 const messagesScrollRef = ref(null)
 
 /* ---------------- 布局 & 尺寸 ---------------- */
@@ -56,15 +57,15 @@ function updateIsMobile () {
 
 const wrapperStyle = computed(() => {
   if (isMobile.value) {
-    // 移动端：真正全屏
     return {
       position: 'fixed',
       left: 0,
-      top: 0,
       right: 0,
       bottom: 0,
       zIndex: 2500,
-      overflow: 'hidden',
+      display: 'flex',
+      justifyContent: 'center',
+      pointerEvents: 'auto',
     }
   }
   return {
@@ -77,18 +78,19 @@ const wrapperStyle = computed(() => {
 
 const cardStyle = computed(() => {
   if (isMobile.value) {
-    // 移动端：卡片占满整个 wrapper
+    const vh = window.innerHeight || 800
+    const h = Math.floor(vh * 0.75)
     return {
-      width: '100%',
-      height: '100%',
+      width: '100vw',
+      maxWidth: '480px',
+      height: `${h}px`,
       display: 'flex',
       flexDirection: 'column',
-      borderRadius: '0',
+      borderRadius: '12px 12px 0 0',
     }
   }
-  // PC 端：限制最大尺寸，避免超出视口
   const safeHeight = Math.min(height.value || 560, Math.floor(window.innerHeight * 0.9))
-  const safeWidth = Math.min(width.value || 420, Math.floor(window.innerWidth * 0.9))
+  const safeWidth = Math.min(width.value || 460, Math.floor(window.innerWidth * 0.9))
   return {
     width: `${safeWidth}px`,
     height: `${safeHeight}px`,
@@ -98,30 +100,29 @@ const cardStyle = computed(() => {
   }
 })
 
-/**
- * 消息区域的高度控制
- * - 移动端：flex 1 + min-height: 0，内部滚动
- * - PC：在窗口高度基础上限制一个 maxHeight，内部滚动
- */
 const messageWrapperStyle = computed(() => {
+  const headerH = 52
+  const footerH = 96
   if (isMobile.value) {
+    const vh = window.innerHeight || 800
+    const totalH = Math.floor(vh * 0.75)
+    const maxH = Math.max(120, totalH - headerH - footerH)
     return {
       flex: '1 1 auto',
-      minHeight: 0,
+      minHeight: '0',
+      maxHeight: `${Math.floor(maxH)}px`,
     }
   }
-  const headerH = 52   // 头部高度
-  const footerH = 96   // 底部输入区域 + padding
   const totalH = Math.min(height.value || 560, Math.floor(window.innerHeight * 0.9))
   const maxH = Math.max(180, totalH - headerH - footerH)
   return {
     flex: '1 1 auto',
-    minHeight: 0,
+    minHeight: '0',
     maxHeight: `${Math.floor(maxH)}px`,
   }
 })
 
-/* ---------------- 拖动 & 缩放（PC） ---------------- */
+/* ---------------- 拖动 & 缩放（PC + 平板触摸） ---------------- */
 
 const dragState = ref({
   dx: 0,
@@ -174,6 +175,40 @@ function onHeaderMouseUp () {
   window.removeEventListener('mouseup', onHeaderMouseUp)
 }
 
+// 触摸拖动（平板等 PC 布局）
+function onHeaderTouchStart (e) {
+  if (isMobile.value) return
+  if (!e.touches || !e.touches.length) return
+  const t = e.touches[0]
+  e.preventDefault()
+  chatStore.setDragging(true)
+  dragState.value = {
+    dx: t.clientX,
+    dy: t.clientY,
+    startL: left.value,
+    startT: top.value,
+  }
+  window.addEventListener('touchmove', onHeaderTouchMove, { passive: false })
+  window.addEventListener('touchend', onHeaderTouchEnd)
+}
+
+function onHeaderTouchMove (e) {
+  if (!e.touches || !e.touches.length) return
+  const touch = e.touches[0]
+  e.preventDefault()
+  const ds = dragState.value
+  const l = ds.startL + (touch.clientX - ds.dx)
+  const t = ds.startT + (touch.clientY - ds.dy)
+  const { l: nl, t: nt } = withinViewport(l, t, width.value, height.value)
+  chatStore.setPosition(nl, nt)
+}
+
+function onHeaderTouchEnd () {
+  chatStore.setDragging(false)
+  window.removeEventListener('touchmove', onHeaderTouchMove)
+  window.removeEventListener('touchend', onHeaderTouchEnd)
+}
+
 function onResizeHandleMouseDown (e) {
   if (isMobile.value) return
   e.preventDefault()
@@ -201,18 +236,7 @@ function onResizeEnd () {
   window.removeEventListener('mouseup', onResizeEnd)
 }
 
-/* ---------------- 表情解析 & 老数据修复 ---------------- */
-/**
- * 统一结构：
- *  - id
- *  - path: 图片路径
- *  - name: 名称（可选）
- *  - audio: 音频路径（可选）
- *
- * 兼容老数据：
- *  "https://api.../xx.png:/emojis/.../sounds/...m4a"
- *  这样的字符串里同时包含图片和音频路径
- */
+/* ---------------- 表情解析 & 老数据兼容 ---------------- */
 
 function normalizeEmojiData (obj) {
   if (!obj || typeof obj !== 'object') return null
@@ -250,7 +274,6 @@ function normalizeEmojiData (obj) {
 
   if (!path || typeof path !== 'string') return null
 
-      // ★ 兼容历史：path 里同时包含图片和音频（png:/emojis/...m4a）
       ;(() => {
     const raw = path
     const protoIdx = raw.indexOf('://')
@@ -269,7 +292,6 @@ function normalizeEmojiData (obj) {
   return { id, path, name, audio }
 }
 
-// 旧格式: id:path:audio?（audio 可能包含冒号）
 function parseLegacyTriplet (inner) {
   const parts = inner.split(':')
   const id = parts[0]
@@ -282,7 +304,6 @@ function parseEmojiAny (content) {
   if (typeof content !== 'string') return null
   const raw = content.trim()
 
-  // [emoji: ...]
   if (raw.startsWith('[emoji:') && raw.endsWith(']')) {
     const inner = raw.slice(7, -1)
     try {
@@ -295,7 +316,6 @@ function parseEmojiAny (content) {
     }
   }
 
-  // 纯 JSON
   if (raw.startsWith('{') && raw.endsWith('}')) {
     try {
       return normalizeEmojiData(JSON.parse(raw))
@@ -304,7 +324,6 @@ function parseEmojiAny (content) {
     }
   }
 
-  // 兜底：有些历史数据直接存 JSON 字符串
   try {
     const obj = JSON.parse(raw)
     return normalizeEmojiData(obj)
@@ -313,7 +332,6 @@ function parseEmojiAny (content) {
   }
 }
 
-// 简单缓存避免重复解析
 const emojiParseCache = new Map()
 
 function getEmojiData (content) {
@@ -341,13 +359,29 @@ function playEmojiAudio (emojiData) {
 
 /* ---------------- 发送文本 / 发送表情 ---------------- */
 
+/**
+ * 加强版：滚动到最后一条消息位置
+ * - 使用 scrollIntoView 对最后一条 .chat-message-row 定位
+ * - 再用两次 requestAnimationFrame 兜底图片 / 布局延迟
+ */
 async function scrollToBottom () {
   await nextTick()
-  const el = messagesScrollRef.value
-  const wrap = el?.wrapRef || el?.$refs?.wrapRef
-  if (wrap) {
-    wrap.scrollTop = wrap.scrollHeight
+  const container = messagesScrollRef.value
+  if (!container) return
+
+  const doScroll = () => {
+    const lastRow = container.querySelector('.chat-message-row:last-child')
+    if (lastRow && typeof lastRow.scrollIntoView === 'function') {
+      lastRow.scrollIntoView({ block: 'end', behavior: 'auto' })
+    } else {
+      container.scrollTop = container.scrollHeight
+    }
   }
+
+  doScroll()
+  requestAnimationFrame(() => {
+    requestAnimationFrame(doScroll)
+  })
 }
 
 async function handleSend () {
@@ -377,7 +411,7 @@ async function handleEmojiSelect (emoji) {
   const audio = emoji.sound_path || emoji.audio_path || emoji.audio
   if (audio) {
     payload.audio = audio
-    playEmojiAudio(payload) // 选择时预听
+    playEmojiAudio(payload)
   }
 
   const content = `[emoji:${JSON.stringify(payload)}]`
@@ -394,13 +428,23 @@ async function handleEmojiSelect (emoji) {
   }
 }
 
+/* ---------------- 表情弹窗 & 点击外部关闭 ---------------- */
+
+function toggleEmoji () {
+  emojiVisible.value = !emojiVisible.value
+}
+
+function onContainerClick () {
+  if (emojiVisible.value) emojiVisible.value = false
+}
+
 /* ---------------- 其他 ---------------- */
 
 function closeWindow () {
+  emojiVisible.value = false
   chatStore.close()
 }
 
-// 新消息自动滚到底
 watch(
     () => messages.value.length,
     async () => {
@@ -409,14 +453,14 @@ watch(
     },
 )
 
-// 打开窗口时自动滚到底
 watch(
     () => visible.value,
-    async (v) => {
-      if (v) {
-        await nextTick()
-        await scrollToBottom()
+    async v => {
+      if (!v) {
+        emojiVisible.value = false
+        return
       }
+      await scrollToBottom()
     },
 )
 
@@ -431,6 +475,8 @@ onUnmounted(() => {
   window.removeEventListener('mouseup', onHeaderMouseUp)
   window.removeEventListener('mousemove', onResizing)
   window.removeEventListener('mouseup', onResizeEnd)
+  window.removeEventListener('touchmove', onHeaderTouchMove)
+  window.removeEventListener('touchend', onHeaderTouchEnd)
 })
 </script>
 
@@ -446,9 +492,14 @@ onUnmounted(() => {
           'chat-container--resizing': isResizing,
         }"
           :style="cardStyle"
+          @click="onContainerClick"
       >
         <!-- 头部 -->
-        <div class="chat-header" @mousedown="onHeaderMouseDown">
+        <div
+            class="chat-header"
+            @mousedown="onHeaderMouseDown"
+            @touchstart.stop="onHeaderTouchStart"
+        >
           <div class="chat-header-left">
             <el-avatar
                 v-if="conversationUser"
@@ -470,7 +521,7 @@ onUnmounted(() => {
           <el-button
               link
               circle
-              @click="closeWindow"
+              @click.stop="closeWindow"
               title="关闭"
           >
             <el-icon><Close /></el-icon>
@@ -481,7 +532,6 @@ onUnmounted(() => {
 
         <!-- 内容区 -->
         <div class="chat-body">
-          <!-- 没有选择好友 -->
           <div
               v-if="!conversationUser"
               class="chat-empty"
@@ -489,7 +539,6 @@ onUnmounted(() => {
             请选择一位好友开始聊天
           </div>
 
-          <!-- 有会话 -->
           <div
               v-else
               class="chat-messages-wrapper"
@@ -507,7 +556,7 @@ onUnmounted(() => {
               暂无聊天记录，发送第一条消息吧～
             </div>
 
-            <el-scrollbar
+            <div
                 v-else
                 ref="messagesScrollRef"
                 class="chat-messages"
@@ -523,7 +572,6 @@ onUnmounted(() => {
                       class="chat-message-bubble"
                       :class="{ 'chat-message-bubble--me': msg.sender_id === me.id }"
                   >
-                    <!-- emoji 消息 -->
                     <template v-if="getEmojiData(msg.content)">
                       <div class="chat-emoji-msg">
                         <img
@@ -531,12 +579,11 @@ onUnmounted(() => {
                             :src="buildEmojiUrl(getEmojiData(msg.content).path)"
                             :alt="getEmojiData(msg.content).name || 'emoji'"
                             :data-audio-path="getEmojiData(msg.content).audio || ''"
-                            @click="playEmojiAudio(getEmojiData(msg.content))"
+                            @click.stop="playEmojiAudio(getEmojiData(msg.content))"
                         />
                       </div>
                     </template>
 
-                    <!-- 纯文本 -->
                     <template v-else>
                       <div class="chat-text-msg">
                         {{ msg.content }}
@@ -564,36 +611,38 @@ onUnmounted(() => {
                   </div>
                 </div>
               </div>
-            </el-scrollbar>
+            </div>
           </div>
         </div>
 
         <el-divider class="chat-divider" />
 
-        <!-- 工具栏 + 表情面板 + 输入 -->
+        <!-- 工具栏 + 表情弹窗 + 输入区 -->
         <div class="chat-footer">
-          <!-- 工具栏 -->
           <div class="chat-tools">
-            <el-button
-                circle
-                text
-                class="chat-toolbar-btn"
-                title="选择表情"
-                @click="emojiVisible = !emojiVisible"
-            >
-              <span class="emoji-btn-icon">😊</span>
-            </el-button>
+            <div class="emoji-trigger-wrapper">
+              <el-button
+                  circle
+                  text
+                  class="chat-toolbar-btn"
+                  title="选择表情"
+                  @click.stop="toggleEmoji"
+              >
+                <span class="emoji-btn-icon">😊</span>
+              </el-button>
+
+              <transition name="chat-emoji-popup-fade">
+                <div
+                    v-if="emojiVisible"
+                    class="chat-emoji-popup"
+                    @click.stop
+                >
+                  <EmojiPicker @select="handleEmojiSelect" />
+                </div>
+              </transition>
+            </div>
           </div>
 
-          <!-- 内嵌表情面板（替代 el-popover） -->
-          <div
-              v-if="emojiVisible"
-              class="chat-emoji-panel"
-          >
-            <EmojiPicker @select="handleEmojiSelect" />
-          </div>
-
-          <!-- 输入 -->
           <div class="chat-input-wrapper">
             <el-input
                 v-model="inputText"
@@ -613,7 +662,6 @@ onUnmounted(() => {
           </div>
         </div>
 
-        <!-- PC 右下角缩放把手 -->
         <div
             v-if="!isMobile"
             class="manual-resize-handle"
@@ -625,10 +673,8 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
-.chat-wrapper {
-}
+.chat-wrapper {}
 
-/* 关键：overflow: hidden，防止消息“穿出”窗口 */
 .chat-container {
   position: relative;
   display: flex;
@@ -636,7 +682,6 @@ onUnmounted(() => {
   overflow: hidden;
 }
 
-/* 头部 */
 .chat-header {
   height: 52px;
   display: flex;
@@ -671,7 +716,6 @@ onUnmounted(() => {
   margin: 0;
 }
 
-/* 主体：flex + min-height:0 保证内部可滚动 */
 .chat-body {
   flex: 1 1 auto;
   min-height: 0;
@@ -687,11 +731,11 @@ onUnmounted(() => {
   flex-direction: column;
 }
 
-/* el-scrollbar 高度 100%，结合上面即可内部滚动 */
 .chat-messages {
   flex: 1 1 auto;
   min-height: 0;
   height: 100%;
+  overflow-y: auto;
 }
 
 .chat-loading,
@@ -741,7 +785,6 @@ onUnmounted(() => {
   white-space: pre-wrap;
 }
 
-/* emoji 消息 */
 .chat-emoji-msg {
   display: flex;
   align-items: center;
@@ -775,14 +818,13 @@ onUnmounted(() => {
 }
 
 .chat-read--unread {
-  background: rgba(255, 255, 255, 0.18);
+  background: rgba(0, 0, 0, 0.06);
 }
 
 .chat-failed {
   color: #f56c6c;
 }
 
-/* 底部 */
 .chat-footer {
   padding: 8px 10px 10px;
   display: flex;
@@ -790,11 +832,15 @@ onUnmounted(() => {
   gap: 6px;
 }
 
-/* 工具栏 */
 .chat-tools {
   display: flex;
   align-items: center;
   gap: 4px;
+}
+
+.emoji-trigger-wrapper {
+  position: relative;
+  display: inline-flex;
 }
 
 .chat-toolbar-btn {
@@ -806,72 +852,35 @@ onUnmounted(() => {
   line-height: 1;
 }
 
-/* 内嵌表情面板 */
-.chat-emoji-panel {
-  margin-top: 4px;
-  margin-bottom: 4px;
+.chat-emoji-popup {
+  position: absolute;
+  left: 0;
+  bottom: 40px;
+  /* ★ 横向稍微加宽一点，并和 EmojiPicker 的宽度匹配 */
+  width: 380px;
+  max-width: 95vw;
+
+  /* 高度只做一个约束，真正的纵向滚动由 EmojiPicker 内部的 .emoji-grid 控制 */
+  max-height: 320px;
+
   border: 1px solid #ebeef5;
   border-radius: 8px;
-  overflow: hidden;
   background: #fff;
-  max-height: 260px;
+
+  /* 不让整个弹窗自己滚动，避免分类栏跟着上下跑 */
+  overflow: visible;
+
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.12);
+  z-index: 20;
 }
 
-/* 输入区 */
-.chat-input-wrapper {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.chat-input :deep(.el-input__wrapper) {
-  padding-left: 10px;
-}
-
-/* 右下角缩放把手（PC） */
-.manual-resize-handle {
-  position: absolute;
-  right: 0;
-  bottom: 0;
-  width: 18px;
-  height: 18px;
-  cursor: nwse-resize;
-  background: linear-gradient(
-      135deg,
-      transparent 0 50%,
-      rgba(150, 150, 150, 0.35) 50% 100%
-  );
-  border-radius: 0 0 12px 0;
-}
-
-.chat-container--dragging {
-  opacity: 0.96;
-}
-
-.chat-container--resizing {
-  user-select: none;
-}
-
-/* 移动端适配 */
+/* 移动端适配：宽度紧贴屏幕，分类栏仍然在底部水平拖动 */
 @media (max-width: 768px) {
-  .chat-header {
-    cursor: default;
-  }
-
-  .chat-message-bubble {
-    max-width: 86vw;
-  }
-
-  .chat-footer {
-    padding-bottom: 12px;
-  }
-
-  .manual-resize-handle {
-    display: none;
-  }
-
-  .chat-emoji-panel {
-    max-height: 50vh;
+  .chat-emoji-popup {
+    width: 95vw;
+    max-width: 95vw;
+    max-height: 60vh;
   }
 }
+
 </style>
