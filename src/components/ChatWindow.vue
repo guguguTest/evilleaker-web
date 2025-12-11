@@ -12,6 +12,8 @@ import { storeToRefs } from 'pinia'
 import { useChatStore } from '@/stores/chat'
 import { useMessageStore } from '@/stores/messages'
 import { useAuthStore } from '@/stores/auth'
+import { useMessageBadgeStore } from '@/stores/messageBadge'
+
 import EmojiPicker from '@/components/EmojiPicker.vue'
 import { baseUrl } from '@/api/base'
 import { joinUrl } from '@/utils/misc'
@@ -20,6 +22,10 @@ import { Close, Loading } from '@element-plus/icons-vue'
 /* ---------------- store & 基本状态 ---------------- */
 
 const chatStore = useChatStore()
+
+const messageBadge = useMessageBadgeStore()
+onMounted(() => { try { messageBadge.init() } catch (e) {} })
+
 const messageStore = useMessageStore()
 const authStore = useAuthStore()
 
@@ -38,6 +44,16 @@ const {
   loadingConversation,
   conversation,
 } = storeToRefs(messageStore)
+watch(
+  () => conversationUser.value && conversationUser.value.id,
+  async (id) => {
+    if (id) {
+      try { await messageBadge.markFriendAsRead(id) } catch (e) {}
+    }
+  },
+  { immediate: true }
+)
+
 
 const me = computed(() => authStore.user || {})
 const messages = computed(() => conversation.value || [])

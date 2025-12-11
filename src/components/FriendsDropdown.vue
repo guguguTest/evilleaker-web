@@ -14,9 +14,9 @@
       <!-- 触发器：好友图标 + 角标 -->
       <template #reference>
         <el-badge
-            :value="requestCount"
+            :value="badgeTotalUnread"
             :max="99"
-            v-if="requestCount > 0"
+            v-if="badgeTotalUnread > 0"
             class="friends-badge-icon"
         >
           <el-button circle text class="friends-icon-btn">
@@ -154,6 +154,7 @@
                           <span class="friend-name">
                             {{ friend.nickname || friend.username }}
                           </span>
+                          <span v-if="friendUnread(friend.id)" class="friend-badge">{{ friendUnread(friend.id) > 99 ? '99+' : friendUnread(friend.id) }}</span>
                           <el-tag
                               v-if="isAdmin(friend)"
                               size="small"
@@ -376,6 +377,8 @@ import { ref, computed, onMounted } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useFriendsStore } from '@/stores/friends'
 import { useChatStore } from '@/stores/chat'
+import { useMessageBadgeStore } from '@/stores/messageBadge'
+
 
 // Element Plus 图标
 import {
@@ -412,6 +415,13 @@ const {
 const visible = ref(false)
 
 // 请求数量
+
+// ===== 消息徽章（好友未读） =====
+const messageBadge = useMessageBadgeStore()
+onMounted(() => { try { messageBadge.init() } catch (e) {} })
+const badgeTotalUnread = computed(() => messageBadge.totalUnread || 0)
+const friendUnread = (id) => messageBadge.getFriendUnread(id)
+
 const requestCount = computed(() => (requests.value ? requests.value.length : 0))
 
 // 打开弹窗时刷新全部数据 —— 使用 friends.js 里的 refreshAll
@@ -777,4 +787,18 @@ const isAdmin = (friend) => {
   font-size: 11px;
   color: #909399;
 }
+
+.friend-badge {
+  margin-left: 6px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  background: #e02433;
+  color: #fff;
+  border-radius: 9999px;
+  font-size: 12px;
+  line-height: 18px;
+  font-weight: 600;
+}
+
 </style>
