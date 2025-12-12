@@ -38,7 +38,9 @@ export const useMessageBadgeStore = defineStore('messageBadge', {
         for (const r of rows) {
           // 仅统计好友消息（来自用户的私信）且未读
           const typeOK = r.message_type === 'user' || r.type === 'user'
-          const unread = r.is_read === false || r.is_read === 0 || r.is_read === '0' || r.read_at == null
+          // 确保正确判断消息是否未读：已读条件为 is_read 为 true/1/'1' 或 read_at 不为 null 且不为空字符串
+          const isRead = r.is_read === true || r.is_read === 1 || r.is_read === '1' || (r.read_at != null && r.read_at !== '')
+          const unread = !isRead
           const fromOther = myId ? (String(r.sender_id) !== String(myId)) : true
           if (typeOK && unread && fromOther) {
             const key = String(r.sender_id)
