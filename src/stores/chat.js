@@ -2,6 +2,7 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { useMessageStore } from '@/stores/messages'
+import { useMessageBadgeStore } from '@/stores/messageBadge'
 
 export const useChatStore = defineStore('chat', () => {
     // 是否显示聊天窗口
@@ -34,26 +35,58 @@ export const useChatStore = defineStore('chat', () => {
     function setDragging (flag) {
         isDragging.value = !!flag
     }
+
     function setResizing (flag) {
         isResizing.value = !!flag
     }
 
+    /**
+     * 打开与某个用户的聊天窗口
+     * - 这里统一做两件事：
+     *   1. 打开聊天窗口（visible = true）
+     *   2. 把该好友的未读徽章清零（调用 messageBadgeStore.markFriendAsRead）
+     */
     async function openChatWithUser (user) {
+        if (!user || !user.id) return
+
         const msgStore = useMessageStore()
+        const badgeStore = useMessageBadgeStore()
+
+        // 先打开窗口（ChatWindow 里会根据 visible 渲染 UI）
         visible.value = true
-        await msgStore.openConversationWithUser(user) // 拉取会话
+
+        // 打开聊天时直接清掉这个好友的未读徽章（乐观更新 + 后端对齐）
+        try {
+            await badgeStore.markFriendAsRead(user.id)
+        } catch (e) {
+            // 清未读失败并不会影响聊天窗口打开，所以这里只打日志
+            console.error('markFriendAsRead error in chatStore.openChatWithUser', e)
+        }
+
+        // 然后再真正拉取会话消息
+        await msgStore.openConversationWithUser(user)
     }
 
     function close () {
-        visible.value = false // 不清空会话，仅隐藏 UI
+        // 不清空会话，仅隐藏 UI
+        visible.value = false
     }
 
     return {
         // state
-        visible, left, top, width, height,
-        isDragging, isResizing,
+        visible,
+        left,
+        top,
+        width,
+        height,
+        isDragging,
+        isResizing,
         // actions
-        openChatWithUser, close,
-        setPosition, setSize, setDragging, setResizing,
+        openChatWithUser,
+        close,
+        setPosition,
+        setSize,
+        setDragging,
+        setResizing,
     }
 })

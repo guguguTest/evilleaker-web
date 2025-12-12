@@ -473,10 +473,24 @@ watch(
     () => visible.value,
     async v => {
       if (!v) {
+        // 关窗口时顺便收起表情面板
         emojiVisible.value = false
         return
       }
+
+      // 窗口刚打开时滚到底部
       await scrollToBottom()
+
+      // 这里补一层保障：只要聊天窗口打开，就把当前会话好友的未读清掉
+      const currentId = conversationUser.value && conversationUser.value.id
+      if (currentId) {
+        try {
+          await messageBadge.markFriendAsRead(currentId)
+        } catch (e) {
+          // 标记失败不影响聊天窗口，静默忽略
+          console.error('markFriendAsRead error in visible watcher', e)
+        }
+      }
     },
 )
 
@@ -696,6 +710,17 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
   overflow: hidden;
+}
+
+.manual-resize-handle {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 16px;
+  height: 16px;
+  cursor: se-resize;
+  /* 轻微的可见性增强，不使用任何 innerHTML 拼接，避免 XSS 风险 */
+  background: transparent;
 }
 
 .chat-header {
