@@ -703,6 +703,43 @@
   color: #764ba2;
 }
 
+/* ==================== 富文本“样式类”映射（兼容后端 XSS 过滤：只允许 class） ==================== */
+/* 字号 */
+.rt-fs-12 { font-size: 12px; }
+.rt-fs-14 { font-size: 14px; }
+.rt-fs-16 { font-size: 16px; }
+.rt-fs-18 { font-size: 18px; }
+.rt-fs-22 { font-size: 22px; }
+.rt-fs-28 { font-size: 28px; }
+
+/* 文字颜色/背景色：前端会生成 rt-c-xxxxxx / rt-bg-xxxxxx（xxxxxx 为 6 位 hex） */
+[class^="rt-c-"] { color: inherit; }
+[class^="rt-bg-"] { background-color: transparent; }
+
+/* 常用颜色（按需扩展；不需要覆盖所有颜色，DOMPurify 允许 class，但我们只在这里提供样式映射） */
+.rt-c-000000 { color: #000000; }
+.rt-c-ffffff { color: #ffffff; }
+.rt-c-ef4444 { color: #ef4444; }
+.rt-c-f59e0b { color: #f59e0b; }
+.rt-c-10b981 { color: #10b981; }
+.rt-c-3b82f6 { color: #3b82f6; }
+.rt-c-667eea { color: #667eea; }
+.rt-c-764ba2 { color: #764ba2; }
+
+.rt-bg-000000 { background-color: #000000; }
+.rt-bg-ffffff { background-color: #ffffff; }
+.rt-bg-ef4444 { background-color: #ef4444; }
+.rt-bg-f59e0b { background-color: #f59e0b; }
+.rt-bg-10b981 { background-color: #10b981; }
+.rt-bg-3b82f6 { background-color: #3b82f6; }
+.rt-bg-667eea { background-color: #667eea; }
+.rt-bg-764ba2 { background-color: #764ba2; }
+
+/* 对齐（用 class 避免 style 被后端 XSS 过滤掉） */
+.rt-align-left { text-align: left; }
+.rt-align-center { text-align: center; }
+.rt-align-right { text-align: right; }
+
 /* 对齐方式 */
 .editor-content [style*="text-align: left"] {
   text-align: left;

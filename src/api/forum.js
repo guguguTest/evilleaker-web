@@ -1,9 +1,9 @@
 // src/api/forum.js
 import request from './index';
 
-// 标签（含 section_key）
-export function getForumTags() {
-    return request.get('/api/forum/tags');
+// 标签（按分区获取）
+export function getForumTags(sectionKey) {
+    return request.get('/api/forum/tags', { params: { section: sectionKey } });
 }
 
 // 分区帖子列表
