@@ -1,5 +1,4 @@
-import {createVNode, render} from 'vue'
-import MessageBox from '@/components/MessageBox.vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
 
 /**
  * 显示消息弹窗
@@ -12,50 +11,38 @@ import MessageBox from '@/components/MessageBox.vue'
  * @returns {Promise<boolean>} 用户点击确认返回 true，取消/关闭返回 false
  */
 export function messageBox(options) {
-    return new Promise((resolve) => {
-        // 创建虚拟节点
-        const vnode = createVNode(MessageBox, {
-            ...options
-        });
-
-        // 创建挂载容器
-        const container = document.createElement('div');
-        document.body.appendChild(container);
-
-        // 渲染组件
-        render(vnode, container);
-
-        // 获取组件实例（通过 expose）
-        const instance = vnode.component?.exposed;
-        if (instance) {
-            instance.resolve((value) => {
-                // 自动清理 DOM
-                render(null, container);
-                document.body.removeChild(container);
-                resolve(value);
-            });
-            instance.open();
-        }
-    });
+    return ElMessageBox({
+        ...options,
+        type: options.type || 'info'
+    }).then(() => true).catch(() => false);
 }
 
 // 快捷方法
 export function alert(message, title = '提示') {
-    return messageBox({message, title, showCancelButton: false});
+    return ElMessageBox.alert(message, title, {
+        confirmButtonText: '确定'
+    }).then(() => true).catch(() => false);
 }
 
 export function confirm(message, title = '确认') {
-    return messageBox({message, title, showCancelButton: true});
+    return ElMessageBox.confirm(message, title, {
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        type: 'warning'
+    }).then(() => true).catch(() => false);
 }
 
 export function showSuccessMessage(message) {
-    return alert(message, '操作成功');
+    ElMessage.success(message);
+    return Promise.resolve(true);
 }
 
 export function showErrorMessage(message) {
-    return alert(message, '操作失败');
+    ElMessage.error(message);
+    return Promise.resolve(false);
 }
 
 export function showInfoMessage(message) {
-    return alert(message, '提示信息');
+    ElMessage.info(message);
+    return Promise.resolve(true);
 }

@@ -41,6 +41,17 @@ export default [
                 }
             },
             {
+                name: 'ForumPost',
+                path: '/forum/post/:id',
+                component: () => import('@/views/Forum.vue'),
+                meta: {
+                    ...PRESET_LOGIN_BS0,
+                    title: '帖子详情',
+                    icon: 'fas fa-comments me-2',
+                    rule: 'forum'
+                }
+            },
+            {
                 name: 'Exchange',
                 path: '/exchange',
                 component: () => import('@/views/404.vue'),

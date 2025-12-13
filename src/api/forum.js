@@ -63,3 +63,8 @@ export function uploadForumImage(formData) {
         },
     });
 }
+
+// 标记分区全部帖子为已读
+export function markAllForumPostsAsRead(sectionKey) {
+    return request.post(`/api/forum/${sectionKey}/mark-read`);
+}
