@@ -46,9 +46,10 @@ export default [
                 component: () => import('@/views/Forum.vue'),
                 meta: {
                     ...PRESET_LOGIN_BS0,
-                    title: '帖子详情',
+                    title: 'sidebar.forumPost',
                     icon: 'fas fa-comments me-2',
-                    rule: 'forum'
+                    rule: 'forum',
+                    hidden: true
                 }
             },
             {

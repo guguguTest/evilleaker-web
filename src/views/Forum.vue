@@ -15,6 +15,7 @@ import {
   getForumTags,
   markAllForumPostsAsRead,
   updateForumPost,
+  updateForumReply,
 } from '@/api/forum'
 import { showErrorMessage, showSuccessMessage } from '@/utils/messageBox'
 import { useAuthStore } from '@/stores/auth'
@@ -50,6 +51,14 @@ const canPost = ref(false)
 const currentPostId = ref(null)
 const postDetail = ref(null) // { post, replies }
 const loadingPostDetail = ref(false)
+
+// 响应式窗口宽度
+const windowWidth = ref(window.innerWidth)
+
+// 监听窗口大小变化
+window.addEventListener('resize', () => {
+  windowWidth.value = window.innerWidth
+})
 
 const isAdmin = computed(() => Number(auth.user?.user_rank || 0) >= 5)
 const currentUserId = computed(() => Number(auth.user?.id || 0))
@@ -99,8 +108,18 @@ function safeHtml (html) {
     ],
     ALLOWED_ATTR: [
       'href','target','rel','src','alt','title','class',
-      'data-audio-path','data-emoji-id',
+      'data-audio-path','data-emoji-id','data-emoji-path','data-image-path',
     ],
+    ALLOWED_CLASSES: {
+      '*': [
+        /^rt-fs-\d+$/, // 字体大小类 rt-fs-12, rt-fs-14, etc.
+        /^rt-c-[0-9a-f]{3,6}$/, // 文字颜色类 rt-c-ff0000, etc.
+        /^rt-bg-[0-9a-f]{3,6}$/, // 背景颜色类 rt-bg-ffff00, etc.
+        /^rt-align-(left|center|right)$/, // 对齐类 rt-align-left, etc.
+        'rt-emoji', 'rt-image', 'emoji-message-img', 'forum-uploaded-image' // 其他富文本类
+      ]
+    },
+    ALLOWED_URI_REGEXP: /^(?:(?:https?|mailto|ftp|tel):|#)/i,
   })
 }
 
@@ -216,8 +235,10 @@ watch(() => pagination.limit, async () => {
 
 const dialog = reactive({
   visible: false,
-  mode: 'create', // create | reply | edit
+  mode: 'create', // create | reply | edit | editReply
   loading: false,
+  replyId: null, // 编辑楼层时的回复ID
+  floorNumber: null, // 编辑楼层时的楼层号
 })
 
 const form = reactive({
@@ -257,6 +278,15 @@ function openEditPostDialog () {
   dialog.visible = true
 }
 
+function openEditReplyDialog (reply) {
+  if (!reply) return
+  dialog.mode = 'editReply'
+  dialog.replyId = reply.id
+  dialog.floorNumber = reply.floor_number
+  form.content = reply.content || ''
+  dialog.visible = true
+}
+
 const canEditCurrentPost = computed(() => {
   const post = postDetail.value?.post
   if (!post) return false
@@ -268,7 +298,7 @@ async function submitDialog () {
     showErrorMessage('内容不能为空')
     return
   }
-  if (dialog.mode !== 'reply' && !String(form.title || '').trim()) {
+  if (dialog.mode !== 'reply' && dialog.mode !== 'editReply' && !String(form.title || '').trim()) {
     showErrorMessage('标题不能为空')
     return
   }
@@ -303,6 +333,16 @@ async function submitDialog () {
       showSuccessMessage('更新成功')
       dialog.visible = false
       await openPost(postId)
+      return
+    }
+
+    if (dialog.mode === 'editReply') {
+      const replyId = dialog.replyId
+      if (!replyId) return
+      await updateForumReply(replyId, { content: form.content })
+      showSuccessMessage('楼层更新成功')
+      dialog.visible = false
+      await openPost(postDetail.value?.post?.id)
       return
     }
 
@@ -649,6 +689,13 @@ onMounted(async () => {
                 </button>
                 <button
                   v-if="isAdmin || Number(r.user_id) === currentUserId"
+                  class="forum-btn forum-btn-secondary forum-btn-sm"
+                  @click="openEditReplyDialog(r)"
+                >
+                  <i class="fas fa-edit" /> 编辑
+                </button>
+                <button
+                  v-if="isAdmin || Number(r.user_id) === currentUserId"
                   class="forum-btn forum-btn-danger forum-btn-sm"
                   @click="onDeleteReply(r.id)"
                 >
@@ -662,9 +709,12 @@ onMounted(async () => {
         <div class="reply-input-area" v-if="!postDetail?.post?.is_closed && (!postDetail?.post?.reply_disabled || isAdmin)">
           <div class="reply-input-title"><i class="fas fa-reply" /> 发表回复</div>
           <ForumRichEditor v-model="form.content" placeholder="请输入回复内容…" />
-          <div style="margin-top: 12px; text-align: right;">
-            <button class="forum-btn forum-btn-primary" @click="openReplyDialog">
-              <i class="fas fa-pen" /> 在弹窗中编辑并发布
+          <div style="margin-top: 12px; text-align: right; display: flex; gap: 8px; justify-content: flex-end;">
+            <button class="forum-btn forum-btn-secondary" @click="openReplyDialog">
+              <i class="fas fa-pen" /> 在弹窗中编辑
+            </button>
+            <button class="forum-btn forum-btn-primary" @click="submitDialog">
+              <i class="fas fa-paper-plane" /> 直接发布
             </button>
           </div>
         </div>
@@ -674,16 +724,17 @@ onMounted(async () => {
     <!-- 编辑弹窗（Element Plus 风格） -->
     <el-dialog
       v-model="dialog.visible"
-      :title="dialog.mode === 'create' ? '发布主题' : (dialog.mode === 'edit' ? '编辑帖子' : '发表回复')"
-      width="860px"
+      :title="dialog.mode === 'create' ? '发布主题' : (dialog.mode === 'edit' ? '编辑帖子' : (dialog.mode === 'editReply' ? `编辑第${dialog.floorNumber}楼` : '发表回复'))"
+      :width="windowWidth > 900 ? '860px' : '90%'"
       :close-on-click-modal="false"
+      :destroy-on-close="true"
     >
       <el-form label-width="80px">
-        <el-form-item v-if="dialog.mode !== 'reply'" label="标题">
+        <el-form-item v-if="dialog.mode !== 'reply' && dialog.mode !== 'editReply'" label="标题">
           <el-input v-model="form.title" maxlength="100" show-word-limit />
         </el-form-item>
 
-        <el-form-item v-if="dialog.mode !== 'reply'" label="标签">
+        <el-form-item v-if="dialog.mode !== 'reply' && dialog.mode !== 'editReply'" label="标签">
           <el-select v-model="form.tag_id" clearable placeholder="请选择标签" style="width: 260px">
             <el-option v-for="t in sectionTags" :key="t.id" :value="t.id" :label="t.tag_name" />
           </el-select>
@@ -693,11 +744,11 @@ onMounted(async () => {
           <ForumRichEditor v-model="form.content" />
         </el-form-item>
         
-        <el-form-item v-if="isAdmin && dialog.mode !== 'reply'" label="管理员设置">
+        <el-form-item v-if="isAdmin && dialog.mode !== 'reply' && dialog.mode !== 'editReply'" label="管理员设置">
           <el-checkbox v-model="form.reply_disabled">不可回复</el-checkbox>
         </el-form-item>
         
-        <el-form-item v-if="isAdmin && dialog.mode !== 'reply'" label="置顶设置">
+        <el-form-item v-if="isAdmin && dialog.mode !== 'reply' && dialog.mode !== 'editReply'" label="置顶设置">
           <el-select v-model="form.pin_level" placeholder="选择置顶级别">
             <el-option label="普通" :value="0" />
             <el-option label="置顶" :value="1" />

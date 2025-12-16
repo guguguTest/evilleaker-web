@@ -45,6 +45,11 @@ export function deleteForumReply(replyId) {
     return request.delete(`/api/forum/replies/${replyId}`);
 }
 
+// 编辑回复
+export function updateForumReply(replyId, data) {
+    return request.put(`/api/forum/replies/${replyId}`, data);
+}
+
 // 管理员 / 楼主采纳答案
 export function acceptReply(postId, replyId) {
     return request.post(`/api/forum/posts/${postId}/accept/${replyId}`);
