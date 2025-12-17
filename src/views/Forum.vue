@@ -3,6 +3,7 @@
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import DOMPurify from 'dompurify'
+import { ensureRichTextColorStylesFromHtml } from '@/utils/richTextColor'
 import { ElMessageBox } from 'element-plus'
 import {
   acceptReply,
@@ -90,7 +91,7 @@ function renderTokens (html) {
     return `<img class="forum-uploaded-image" src="${src}" alt="image" />`
   })
 
-  // @mention（避免在标签内部误伤：这里只处理纯文本区域较难；最终仍由 DOMPurify 兜底）
+  // @mention
   out = out.replace(/(^|[\s>])@([^\s@<]+)/g, (_m, p1, name) => {
     return `${p1}<span class="mention">@${name}</span>`
   })
@@ -99,7 +100,7 @@ function renderTokens (html) {
 }
 
 function safeHtml (html) {
-  return DOMPurify.sanitize(renderTokens(html), {
+  const cleaned = DOMPurify.sanitize(renderTokens(html), {
     ALLOWED_TAGS: [
       'p','br','b','strong','i','em','u','s',
       'ul','ol','li','blockquote','span','code','pre',
@@ -112,15 +113,19 @@ function safeHtml (html) {
     ],
     ALLOWED_CLASSES: {
       '*': [
-        /^rt-fs-\d+$/, // 字体大小类 rt-fs-12, rt-fs-14, etc.
-        /^rt-c-[0-9a-f]{3,6}$/, // 文字颜色类 rt-c-ff0000, etc.
-        /^rt-bg-[0-9a-f]{3,6}$/, // 背景颜色类 rt-bg-ffff00, etc.
-        /^rt-align-(left|center|right)$/, // 对齐类 rt-align-left, etc.
-        'rt-emoji', 'rt-image', 'emoji-message-img', 'forum-uploaded-image' // 其他富文本类
+        /^rt-fs-\d+$/,
+        /^rt-c-[0-9a-f]{3,6}$/,
+        /^rt-bg-[0-9a-f]{3,6}$/,
+        /^rt-align-(left|center|right)$/,
+        'rt-emoji', 'rt-image', 'emoji-message-img', 'forum-uploaded-image'
       ]
     },
     ALLOWED_URI_REGEXP: /^(?:(?:https?|mailto|ftp|tel):|#)/i,
   })
+
+  // ✅ 确保 rt-c-xxxxxx / rt-bg-xxxxxx 的动态颜色 class 在展示页也能生效
+  ensureRichTextColorStylesFromHtml(cleaned)
+  return cleaned
 }
 
 function formatTime (t) {
@@ -151,7 +156,7 @@ async function loadPosts () {
       tag_id: tagId.value || undefined,
     })
 
-    // 后端返回：{ posts, pagination, userInfo }
+    // ✅ 后端返回：{ posts, pagination, userInfo }
     posts.value = res?.posts || []
     pagination.total = Number(res?.pagination?.totalItems || 0)
     canPost.value = !!res?.userInfo?.canPost
@@ -184,10 +189,12 @@ async function markAllRead () {
 
 async function openPost (postId) {
   currentPostId.value = postId
-  // 更新路由，实现分享功能
   router.push(`/forum/post/${postId}`)
-  // 清理草稿，避免跨帖串内容
+
+  // ✅ 清理草稿，避免跨帖串内容
   form.content = ''
+  quickReplyContent.value = ''
+
   loadingPostDetail.value = true
   try {
     postDetail.value = await getForumPostDetail(postId)
@@ -204,9 +211,7 @@ async function openPost (postId) {
 function backToList () {
   currentPostId.value = null
   postDetail.value = null
-  // 返回列表页时更新路由
   router.push('/forum')
-  // 详情页打开时已写入阅读记录，返回后刷新列表（让未读红点消失）
   pagination.page = 1
   loadPosts()
 }
@@ -248,6 +253,9 @@ const form = reactive({
   reply_disabled: false,
   pin_level: 0,
 })
+
+// ✅ 详情页底部快捷回帖输入框（与弹窗表单分离，避免编辑帖子时把内容串到回帖区）
+const quickReplyContent = ref('')
 
 function openCreateDialog () {
   dialog.mode = 'create'
@@ -310,8 +318,8 @@ async function submitDialog () {
         title: form.title,
         content: form.content,
         tag_id: form.tag_id || null,
-        reply_disabled: isAdmin ? form.reply_disabled : false,
-        pin_level: isAdmin ? form.pin_level : 0,
+        reply_disabled: isAdmin.value ? form.reply_disabled : false,
+        pin_level: isAdmin.value ? form.pin_level : 0,
       })
       showSuccessMessage('发帖成功')
       dialog.visible = false
@@ -327,8 +335,8 @@ async function submitDialog () {
         title: form.title,
         content: form.content,
         tag_id: form.tag_id || null,
-        reply_disabled: isAdmin ? form.reply_disabled : false,
-        pin_level: isAdmin ? form.pin_level : 0,
+        reply_disabled: isAdmin.value ? form.reply_disabled : false,
+        pin_level: isAdmin.value ? form.pin_level : 0,
       })
       showSuccessMessage('更新成功')
       dialog.visible = false
@@ -346,7 +354,7 @@ async function submitDialog () {
       return
     }
 
-    // reply
+    // reply（弹窗回帖）
     const postId = postDetail.value?.post?.id
     if (!postId) return
     await createForumReply(postId, { content: form.content })
@@ -358,6 +366,27 @@ async function submitDialog () {
     showErrorMessage(e?.error || e?.message || '操作失败')
   } finally {
     dialog.loading = false
+  }
+}
+
+// ✅ 详情页底部“回帖”（不走弹窗）
+async function submitQuickReply () {
+  const content = String(quickReplyContent.value || '').trim()
+  if (!content) {
+    showErrorMessage('内容不能为空')
+    return
+  }
+  const postId = postDetail.value?.post?.id
+  if (!postId) return
+
+  try {
+    await createForumReply(postId, { content })
+    showSuccessMessage('回帖成功')
+    quickReplyContent.value = ''
+    await openPost(postId)
+  } catch (e) {
+    console.error(e)
+    showErrorMessage(e?.error || e?.message || '操作失败')
   }
 }
 
@@ -409,32 +438,30 @@ watch(() => route.params.id, async (newId) => {
 
 async function sharePost () {
   if (!currentPostId.value) return
-  
+
   const shareUrl = `${window.location.origin}${window.location.pathname}#/forum/post/${currentPostId.value}`
-  
+
   try {
     await navigator.clipboard.writeText(shareUrl)
     showSuccessMessage('帖子链接已复制到剪贴板')
   } catch (e) {
     console.error('复制链接失败', e)
-    // 降级方案：显示链接让用户手动复制
     await ElMessageBox.alert(
-      `帖子链接：<a href="${shareUrl}" target="_blank">${shareUrl}</a>`,
-      '分享帖子',
-      { 
-        dangerouslyUseHTMLString: true,
-        confirmButtonText: '复制链接',
-        callback: () => {
-          // 创建临时输入框复制
-          const input = document.createElement('input')
-          input.value = shareUrl
-          document.body.appendChild(input)
-          input.select()
-          document.execCommand('copy')
-          document.body.removeChild(input)
-          showSuccessMessage('帖子链接已复制到剪贴板')
+        `帖子链接：<a href="${shareUrl}" target="_blank">${shareUrl}</a>`,
+        '分享帖子',
+        {
+          dangerouslyUseHTMLString: true,
+          confirmButtonText: '复制链接',
+          callback: () => {
+            const input = document.createElement('input')
+            input.value = shareUrl
+            document.body.appendChild(input)
+            input.select()
+            document.execCommand('copy')
+            document.body.removeChild(input)
+            showSuccessMessage('帖子链接已复制到剪贴板')
+          }
         }
-      }
     )
   }
 }
@@ -445,8 +472,7 @@ onMounted(async () => {
   await auth.init()
   await loadTagsForSection()
   await loadPosts()
-  
-  // 如果当前路由是帖子详情页，自动加载帖子
+
   if (route.params.id) {
     await openPost(route.params.id)
   }
@@ -465,12 +491,12 @@ onMounted(async () => {
       <div style="width:280px; flex:0 0 280px;">
         <div class="section-grid" style="grid-template-columns: 1fr; margin-top: 0;">
           <div
-            v-for="s in SECTION_CONFIG"
-            :key="s.key"
-            class="section-card"
-            :class="s.key"
-            style="padding: 14px;"
-            @click="switchSection(s.key)"
+              v-for="s in SECTION_CONFIG"
+              :key="s.key"
+              class="section-card"
+              :class="s.key"
+              style="padding: 14px;"
+              @click="switchSection(s.key)"
           >
             <div class="section-icon"><i :class="s.icon" /></div>
             <div class="section-name">{{ s.name }}</div>
@@ -483,26 +509,26 @@ onMounted(async () => {
         <div class="forum-toolbar">
           <div class="toolbar-left">
             <el-input
-              v-model="keyword"
-              placeholder="搜索标题/内容"
-              clearable
-              style="width: 260px"
-              @keyup.enter="() => { pagination.page = 1; loadPosts(); }"
-              @clear="() => { pagination.page = 1; loadPosts(); }"
+                v-model="keyword"
+                placeholder="搜索标题/内容"
+                clearable
+                style="width: 260px"
+                @keyup.enter="() => { pagination.page = 1; loadPosts(); }"
+                @clear="() => { pagination.page = 1; loadPosts(); }"
             />
 
             <el-select
-              v-model="tagId"
-              clearable
-              placeholder="标签筛选"
-              style="width: 180px"
-              @change="() => { pagination.page = 1; loadPosts(); }"
+                v-model="tagId"
+                clearable
+                placeholder="标签筛选"
+                style="width: 180px"
+                @change="() => { pagination.page = 1; loadPosts(); }"
             >
               <el-option
-                v-for="t in sectionTags"
-                :key="t.id"
-                :label="t.tag_name"
-                :value="t.id"
+                  v-for="t in sectionTags"
+                  :key="t.id"
+                  :label="t.tag_name"
+                  :value="t.id"
               />
             </el-select>
 
@@ -514,28 +540,19 @@ onMounted(async () => {
           </div>
 
           <div class="toolbar-right">
-            <button
-              class="forum-btn forum-btn-secondary"
-              @click="refreshPosts"
-            >
-              <i class="fas fa-sync-alt" />
-              刷新
+            <button class="forum-btn forum-btn-secondary" @click="refreshPosts">
+              <i class="fas fa-sync-alt" /> 刷新
+            </button>
+            <button class="forum-btn forum-btn-secondary" @click="markAllRead">
+              <i class="fas fa-check-double" /> 全部已读
             </button>
             <button
-              class="forum-btn forum-btn-secondary"
-              @click="markAllRead"
+                class="forum-btn forum-btn-primary"
+                :disabled="!canPost"
+                @click="openCreateDialog"
+                :title="canPost ? '' : '当前分区发帖权限不足'"
             >
-              <i class="fas fa-check-double" />
-              全部已读
-            </button>
-            <button
-              class="forum-btn forum-btn-primary"
-              :disabled="!canPost"
-              @click="openCreateDialog"
-              :title="canPost ? '' : '当前分区发帖权限不足'"
-            >
-              <i class="fas fa-plus-circle" />
-              发布主题
+              <i class="fas fa-plus-circle" /> 发布主题
             </button>
           </div>
         </div>
@@ -550,11 +567,11 @@ onMounted(async () => {
 
           <div v-else>
             <div
-              v-for="p in posts"
-              :key="p.id"
-              class="post-item"
-              :class="{ 'post-pinned': (p.pin_level||0) > 0, 'post-unread': !!p.is_unread }"
-              @click="openPost(p.id)"
+                v-for="p in posts"
+                :key="p.id"
+                class="post-item"
+                :class="{ 'post-pinned': (p.pin_level||0) > 0, 'post-unread': !!p.is_unread }"
+                @click="openPost(p.id)"
             >
               <img :src="p.avatar" class="post-avatar" alt="avatar" />
 
@@ -563,9 +580,9 @@ onMounted(async () => {
                   <span v-if="p.is_unread" class="unread-indicator" />
                   <span class="post-title" :class="{ 'post-title-unread': !!p.is_unread }">{{ p.title }}</span>
                   <span
-                    v-if="p.tag_name"
-                    class="post-tag"
-                    :style="{ background: p.tag_color, color: p.text_color }"
+                      v-if="p.tag_name"
+                      class="post-tag"
+                      :style="{ background: p.tag_color, color: p.text_color }"
                   >{{ p.tag_name }}</span>
                 </div>
                 <div class="post-meta">
@@ -583,14 +600,14 @@ onMounted(async () => {
 
         <div style="margin-top: 12px; display:flex; justify-content:flex-end;">
           <el-pagination
-            background
-            layout="total, sizes, prev, pager, next"
-            :total="pagination.total"
-            v-model:current-page="pagination.page"
-            v-model:page-size="pagination.limit"
-            :page-sizes="[20,50,100]"
-            @current-change="loadPosts"
-            @size-change="() => { pagination.page = 1; loadPosts(); }"
+              background
+              layout="total, sizes, prev, pager, next"
+              :total="pagination.total"
+              v-model:current-page="pagination.page"
+              v-model:page-size="pagination.limit"
+              :page-sizes="[20,50,100]"
+              @current-change="loadPosts"
+              @size-change="() => { pagination.page = 1; loadPosts(); }"
           />
         </div>
       </div>
@@ -620,23 +637,20 @@ onMounted(async () => {
           </div>
 
           <div class="post-detail-toolbar">
-            <button
-              class="forum-btn forum-btn-secondary forum-btn-sm"
-              @click="sharePost"
-            >
+            <button class="forum-btn forum-btn-secondary forum-btn-sm" @click="sharePost">
               <i class="fas fa-share-alt" /> 分享
             </button>
             <button
-              v-if="canEditCurrentPost"
-              class="forum-btn forum-btn-secondary forum-btn-sm"
-              @click="openEditPostDialog"
+                v-if="canEditCurrentPost"
+                class="forum-btn forum-btn-secondary forum-btn-sm"
+                @click="openEditPostDialog"
             >
               <i class="fas fa-edit" /> 编辑
             </button>
             <button
-              v-if="postDetail?.post?.section_key === 'qa' && (Number(postDetail?.post?.user_id) === currentUserId) && !postDetail?.post?.is_closed && !postDetail?.post?.is_solved"
-              class="forum-btn forum-btn-warning forum-btn-sm"
-              @click="onClosePost"
+                v-if="postDetail?.post?.section_key === 'qa' && (Number(postDetail?.post?.user_id) === currentUserId) && !postDetail?.post?.is_closed && !postDetail?.post?.is_solved"
+                class="forum-btn forum-btn-warning forum-btn-sm"
+                @click="onClosePost"
             >
               <i class="fas fa-times-circle" /> 结贴
             </button>
@@ -662,10 +676,10 @@ onMounted(async () => {
 
           <!-- 回复楼层 -->
           <div
-            v-for="r in postDetail?.replies || []"
-            :key="r.id"
-            class="reply-item"
-            :id="`floor-${r.floor_number}`"
+              v-for="r in postDetail?.replies || []"
+              :key="r.id"
+              class="reply-item"
+              :id="`floor-${r.floor_number}`"
           >
             <div class="reply-author">
               <img :src="r.avatar" class="reply-author-avatar" alt="avatar" />
@@ -681,23 +695,23 @@ onMounted(async () => {
 
               <div class="reply-actions" v-if="isAdmin || Number(r.user_id) === currentUserId || (postDetail?.post?.section_key==='qa' && Number(postDetail?.post?.user_id)===currentUserId && !postDetail?.post?.is_closed && !postDetail?.post?.is_solved)">
                 <button
-                  v-if="postDetail?.post?.section_key==='qa' && Number(postDetail?.post?.user_id)===currentUserId && !postDetail?.post?.is_closed && !postDetail?.post?.is_solved"
-                  class="forum-btn forum-btn-success forum-btn-sm"
-                  @click="onAcceptReply(r.id)"
+                    v-if="postDetail?.post?.section_key==='qa' && Number(postDetail?.post?.user_id)===currentUserId && !postDetail?.post?.is_closed && !postDetail?.post?.is_solved"
+                    class="forum-btn forum-btn-success forum-btn-sm"
+                    @click="onAcceptReply(r.id)"
                 >
                   <i class="fas fa-check-circle" /> 采纳
                 </button>
                 <button
-                  v-if="isAdmin || Number(r.user_id) === currentUserId"
-                  class="forum-btn forum-btn-secondary forum-btn-sm"
-                  @click="openEditReplyDialog(r)"
+                    v-if="isAdmin || Number(r.user_id) === currentUserId"
+                    class="forum-btn forum-btn-secondary forum-btn-sm"
+                    @click="openEditReplyDialog(r)"
                 >
                   <i class="fas fa-edit" /> 编辑
                 </button>
                 <button
-                  v-if="isAdmin || Number(r.user_id) === currentUserId"
-                  class="forum-btn forum-btn-danger forum-btn-sm"
-                  @click="onDeleteReply(r.id)"
+                    v-if="isAdmin || Number(r.user_id) === currentUserId"
+                    class="forum-btn forum-btn-danger forum-btn-sm"
+                    @click="onDeleteReply(r.id)"
                 >
                   <i class="fas fa-trash" /> 删除
                 </button>
@@ -706,15 +720,13 @@ onMounted(async () => {
           </div>
         </div>
 
+        <!-- ✅ 回帖区：只保留回帖按钮，不再用 form.content -->
         <div class="reply-input-area" v-if="!postDetail?.post?.is_closed && (!postDetail?.post?.reply_disabled || isAdmin)">
-          <div class="reply-input-title"><i class="fas fa-reply" /> 发表回复</div>
-          <ForumRichEditor v-model="form.content" placeholder="请输入回复内容…" />
+          <div class="reply-input-title"><i class="fas fa-reply" /> 回帖</div>
+          <ForumRichEditor v-model="quickReplyContent" placeholder="请输入回帖内容…" />
           <div style="margin-top: 12px; text-align: right; display: flex; gap: 8px; justify-content: flex-end;">
-            <button class="forum-btn forum-btn-secondary" @click="openReplyDialog">
-              <i class="fas fa-pen" /> 在弹窗中编辑
-            </button>
-            <button class="forum-btn forum-btn-primary" @click="submitDialog">
-              <i class="fas fa-paper-plane" /> 直接发布
+            <button class="forum-btn forum-btn-primary" @click="submitQuickReply">
+              <i class="fas fa-paper-plane" /> 回帖
             </button>
           </div>
         </div>
@@ -723,11 +735,11 @@ onMounted(async () => {
 
     <!-- 编辑弹窗（Element Plus 风格） -->
     <el-dialog
-      v-model="dialog.visible"
-      :title="dialog.mode === 'create' ? '发布主题' : (dialog.mode === 'edit' ? '编辑帖子' : (dialog.mode === 'editReply' ? `编辑第${dialog.floorNumber}楼` : '发表回复'))"
-      :width="windowWidth > 900 ? '860px' : '90%'"
-      :close-on-click-modal="false"
-      :destroy-on-close="true"
+        v-model="dialog.visible"
+        :title="dialog.mode === 'create' ? '发布主题' : (dialog.mode === 'edit' ? '编辑帖子' : (dialog.mode === 'editReply' ? `编辑第${dialog.floorNumber}楼` : '发表回复'))"
+        :width="windowWidth > 900 ? '860px' : '90%'"
+        :close-on-click-modal="false"
+        :destroy-on-close="true"
     >
       <el-form label-width="80px">
         <el-form-item v-if="dialog.mode !== 'reply' && dialog.mode !== 'editReply'" label="标题">
@@ -743,11 +755,11 @@ onMounted(async () => {
         <el-form-item label="内容">
           <ForumRichEditor v-model="form.content" />
         </el-form-item>
-        
+
         <el-form-item v-if="isAdmin && dialog.mode !== 'reply' && dialog.mode !== 'editReply'" label="管理员设置">
           <el-checkbox v-model="form.reply_disabled">不可回复</el-checkbox>
         </el-form-item>
-        
+
         <el-form-item v-if="isAdmin && dialog.mode !== 'reply' && dialog.mode !== 'editReply'" label="置顶设置">
           <el-select v-model="form.pin_level" placeholder="选择置顶级别">
             <el-option label="普通" :value="0" />
